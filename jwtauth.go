@@ -15,17 +15,24 @@ var (
 )
 
 type JwtAuth struct {
-	signKey   []byte
-	verifyKey []byte
-	signer    jwt.SigningMethod
+	signKey         []byte
+	verifyKey       []byte
+	signer          jwt.SigningMethod
+	tokenIsOptional bool
 }
 
-// verifyKey is only for RSA
-func New(alg string, signKey []byte, verifyKey []byte) *JwtAuth {
+// New creates new JwtAuth middleware.
+// Parameters are: signing algorithm's name,
+// signing key,
+// verifying key (RSA only)
+// and boolean, indicating if token is optional.
+// Context values are not saved if token was not found.
+func New(alg string, signKey []byte, verifyKey []byte, keyIsOptional bool) *JwtAuth {
 	return &JwtAuth{
-		signKey:   signKey,
-		verifyKey: verifyKey,
-		signer:    jwt.GetSigningMethod(alg),
+		signKey:         signKey,
+		verifyKey:       verifyKey,
+		signer:          jwt.GetSigningMethod(alg),
+		tokenIsOptional: keyIsOptional,
 	}
 }
 
@@ -65,9 +72,15 @@ func (ja *JwtAuth) Handle(paramAliases ...string) func(chi.Handler) chi.Handler 
 				}
 			}
 
-			// Token is required, cya
+			// If token is optional then pass the request,
+			// else error out.
 			if tokenStr == "" {
-				err = errUnauthorized
+				if !ja.tokenIsOptional {
+					http.Error(w, errUnauthorized.Error(), 401)
+				} else {
+					next.ServeHTTPC(ctx, w, r)
+				}
+				return
 			}
 
 			// Verify the token
