@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/pressly/chi"
@@ -88,6 +89,15 @@ func (ja *JwtAuth) Handle(paramAliases ...string) func(chi.Handler) chi.Handler 
 				return
 			}
 
+			// Check expiry via "exp" claim
+			if exp, ok := token.Claims["exp"].(int64); ok {
+				now := EpochNow()
+				if exp < now {
+					http.Error(w, errUnauthorized.Error(), 401)
+					return
+				}
+			}
+
 			ctx = context.WithValue(ctx, "jwt", token.Raw)
 			ctx = context.WithValue(ctx, "jwt.token", token)
 
@@ -122,4 +132,9 @@ func (ja *JwtAuth) Decode(tokenString string) (t *jwt.Token, err error) {
 		return ja.parser.Parse(tokenString, ja.keyFunc)
 	}
 	return jwt.Parse(tokenString, ja.keyFunc)
+}
+
+// Return the NumericDate time value used in conventional jwt claims
+func EpochNow() int64 {
+	return time.Now().UTC().Unix()
 }
