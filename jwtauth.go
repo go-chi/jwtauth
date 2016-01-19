@@ -18,6 +18,7 @@ type JwtAuth struct {
 	signKey   []byte
 	verifyKey []byte
 	signer    jwt.SigningMethod
+	parser    *jwt.Parser
 }
 
 // verifyKey is only for RSA
@@ -26,6 +27,16 @@ func New(alg string, signKey []byte, verifyKey []byte) *JwtAuth {
 		signKey:   signKey,
 		verifyKey: verifyKey,
 		signer:    jwt.GetSigningMethod(alg),
+	}
+}
+
+// the same as New, except it supports custom parser settings introduced in ver. 2.4.0 of jwt-go
+func NewWithParser(alg string, parser *jwt.Parser, signKey []byte, verifyKey []byte) *JwtAuth {
+	return &JwtAuth{
+		signKey:   signKey,
+		verifyKey: verifyKey,
+		signer:    jwt.GetSigningMethod(alg),
+		parser:    parser,
 	}
 }
 
@@ -98,12 +109,17 @@ func (ja *JwtAuth) Encode(claims map[string]interface{}) (t *jwt.Token, tokenStr
 	return
 }
 
+func (ja *JwtAuth) keyFunc(t *jwt.Token) (interface{}, error) {
+	if ja.verifyKey != nil && len(ja.verifyKey) > 0 {
+		return ja.verifyKey, nil
+	} else {
+		return ja.signKey, nil
+	}
+}
+
 func (ja *JwtAuth) Decode(tokenString string) (t *jwt.Token, err error) {
-	return jwt.Parse(tokenString, func(t *jwt.Token) (interface{}, error) {
-		if ja.verifyKey != nil && len(ja.verifyKey) > 0 {
-			return ja.verifyKey, nil
-		} else {
-			return ja.signKey, nil
-		}
-	})
+	if ja.parser != nil {
+		return ja.parser.Parse(tokenString, ja.keyFunc)
+	}
+	return jwt.Parse(tokenString, ja.keyFunc)
 }
