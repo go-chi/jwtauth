@@ -233,6 +233,13 @@ func (c Claims) SetIssuedNow() Claims {
 }
 
 // Set expiry ("exp") in the claims and return itself so it can be chained
+func (c Claims) SetExpiry(tm time.Time) Claims {
+	c["exp"] = tm.UTC().Unix()
+	return c
+}
+
+// Set expiry ("exp") in the claims to some duration from the present time
+// and return itself so it can be chained
 func (c Claims) SetExpiryIn(tm time.Duration) Claims {
 	c["exp"] = ExpireIn(tm)
 	return c
