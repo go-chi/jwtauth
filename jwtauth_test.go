@@ -21,7 +21,7 @@ var (
 )
 
 func init() {
-	TokenAuth = jwtauth.New("HS256", []byte("secretpass"), nil)
+	TokenAuth = jwtauth.New("HS256", TokenSecret, nil)
 }
 
 //
