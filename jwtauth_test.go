@@ -31,8 +31,7 @@ func init() {
 func TestSimple(t *testing.T) {
 	r := chi.NewRouter()
 
-	r.Use(TokenAuth.Verifier)
-	r.Use(jwtauth.Authenticator)
+	r.Use(TokenAuth.Verifier, jwtauth.Authenticator)
 
 	r.Get("/", func(ctx context.Context, w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("welcome"))
