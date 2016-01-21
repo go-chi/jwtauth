@@ -74,7 +74,6 @@ func TestMore(t *testing.T) {
 				if jwtErr, ok := ctx.Value("jwt.err").(error); ok {
 					switch jwtErr {
 					default:
-						log.Println("...we're expired... I think..:", jwtErr)
 						http.Error(w, http.StatusText(401), 401)
 						return
 					case jwtauth.ErrExpired:
@@ -90,7 +89,6 @@ func TestMore(t *testing.T) {
 
 				jwtToken, ok := ctx.Value("jwt").(*jwt.Token)
 				if !ok || jwtToken == nil || !jwtToken.Valid {
-					log.Println("jwt token..........?", jwtToken)
 					http.Error(w, http.StatusText(401), 401)
 					return
 				}
