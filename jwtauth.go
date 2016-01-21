@@ -164,8 +164,6 @@ func (ja *JwtAuth) keyFunc(t *jwt.Token) (interface{}, error) {
 func (ja *JwtAuth) IsExpired(t *jwt.Token) bool {
 	if expv, ok := t.Claims["exp"]; ok {
 		var exp int64
-		now := EpochNow()
-
 		switch v := expv.(type) {
 		case float64:
 			exp = int64(v)
@@ -174,7 +172,7 @@ func (ja *JwtAuth) IsExpired(t *jwt.Token) bool {
 		default:
 		}
 
-		if exp < now {
+		if exp < EpochNow() {
 			return true
 		}
 	}
