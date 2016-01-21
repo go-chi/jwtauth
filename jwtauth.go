@@ -1,6 +1,7 @@
 package jwtauth
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
@@ -169,6 +170,8 @@ func (ja *JwtAuth) IsExpired(t *jwt.Token) bool {
 			exp = int64(v)
 		case int64:
 			exp = v
+		case json.Number:
+			exp, _ = v.Int64()
 		default:
 		}
 
