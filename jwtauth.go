@@ -217,13 +217,13 @@ func (c Claims) Get(k string) (interface{}, bool) {
 	return v, ok
 }
 
-// Set issues at ("iat") to specified time in the claims
+// Set issued at ("iat") to specified time in the claims
 func (c Claims) SetIssuedAt(tm time.Time) Claims {
 	c["iat"] = tm.UTC().Unix()
 	return c
 }
 
-// Set issues at ("iat") to present time in the claims
+// Set issued at ("iat") to present time in the claims
 func (c Claims) SetIssuedNow() Claims {
 	c["iat"] = EpochNow()
 	return c
