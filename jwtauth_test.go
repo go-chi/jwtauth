@@ -41,22 +41,22 @@ func TestSimple(t *testing.T) {
 	defer ts.Close()
 
 	// sending unauthorized requests
-	if resp := testRequest(t, ts, "GET", "/", nil, nil); resp != "Unauthorized\n" {
+	if status, resp := testRequest(t, ts, "GET", "/", nil, nil); status != 401 && resp != "Unauthorized\n" {
 		t.Fatalf(resp)
 	}
 
 	h := http.Header{}
 	h.Set("Authorization", "BEARER "+newJwtToken([]byte("wrong"), map[string]interface{}{}))
-	if resp := testRequest(t, ts, "GET", "/", h, nil); resp != "Unauthorized\n" {
+	if status, resp := testRequest(t, ts, "GET", "/", h, nil); status != 401 && resp != "Unauthorized\n" {
 		t.Fatalf(resp)
 	}
 	h.Set("Authorization", "BEARER asdf")
-	if resp := testRequest(t, ts, "GET", "/", h, nil); resp != "Unauthorized\n" {
+	if status, resp := testRequest(t, ts, "GET", "/", h, nil); status != 401 && resp != "Unauthorized\n" {
 		t.Fatalf(resp)
 	}
 
 	// sending authorized requests
-	if resp := testRequest(t, ts, "GET", "/", newAuthHeader(), nil); resp != "welcome" {
+	if status, resp := testRequest(t, ts, "GET", "/", newAuthHeader(), nil); status != 200 && resp != "welcome" {
 		t.Fatalf(resp)
 	}
 }
@@ -114,32 +114,32 @@ func TestMore(t *testing.T) {
 	defer ts.Close()
 
 	// sending unauthorized requests
-	if resp := testRequest(t, ts, "GET", "/admin", nil, nil); resp != "Unauthorized\n" {
+	if status, resp := testRequest(t, ts, "GET", "/admin", nil, nil); status != 401 && resp != "Unauthorized\n" {
 		t.Fatalf(resp)
 	}
 
 	h := http.Header{}
 	h.Set("Authorization", "BEARER "+newJwtToken([]byte("wrong"), map[string]interface{}{}))
-	if resp := testRequest(t, ts, "GET", "/admin", h, nil); resp != "Unauthorized\n" {
+	if status, resp := testRequest(t, ts, "GET", "/admin", h, nil); status != 401 && resp != "Unauthorized\n" {
 		t.Fatalf(resp)
 	}
 	h.Set("Authorization", "BEARER asdf")
-	if resp := testRequest(t, ts, "GET", "/admin", h, nil); resp != "Unauthorized\n" {
+	if status, resp := testRequest(t, ts, "GET", "/admin", h, nil); status != 401 && resp != "Unauthorized\n" {
 		t.Fatalf(resp)
 	}
 
 	h = newAuthHeader((jwtauth.Claims{}).Set("exp", jwtauth.EpochNow()-1000))
-	if resp := testRequest(t, ts, "GET", "/admin", h, nil); resp != "expired\n" {
+	if status, resp := testRequest(t, ts, "GET", "/admin", h, nil); status != 401 && resp != "expired\n" {
 		t.Fatalf(resp)
 	}
 
 	// sending authorized requests
-	if resp := testRequest(t, ts, "GET", "/", nil, nil); resp != "welcome" {
+	if status, resp := testRequest(t, ts, "GET", "/", nil, nil); status != 200 && resp != "welcome" {
 		t.Fatalf(resp)
 	}
 
 	h = newAuthHeader((jwtauth.Claims{}).SetExpiryIn(5 * time.Minute))
-	if resp := testRequest(t, ts, "GET", "/admin", h, nil); resp != "protected" {
+	if status, resp := testRequest(t, ts, "GET", "/admin", h, nil); status != 200 && resp != "protected" {
 		t.Fatalf(resp)
 	}
 }
@@ -148,11 +148,11 @@ func TestMore(t *testing.T) {
 // Test helper functions
 //
 
-func testRequest(t *testing.T, ts *httptest.Server, method, path string, header http.Header, body io.Reader) string {
+func testRequest(t *testing.T, ts *httptest.Server, method, path string, header http.Header, body io.Reader) (int, string) {
 	req, err := http.NewRequest(method, ts.URL+path, body)
 	if err != nil {
 		t.Fatal(err)
-		return ""
+		return 0, ""
 	}
 
 	if header != nil {
@@ -164,17 +164,17 @@ func testRequest(t *testing.T, ts *httptest.Server, method, path string, header 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
-		return ""
+		return 0, ""
 	}
 
 	respBody, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatal(err)
-		return ""
+		return 0, ""
 	}
 	defer resp.Body.Close()
 
-	return string(respBody)
+	return resp.StatusCode, string(respBody)
 }
 
 func newJwtToken(secret []byte, claims ...jwtauth.Claims) string {
