@@ -14,6 +14,7 @@ for all unverified tokens and passes the good ones through. You can also copy th
 Authenticator and customize it to handle invalid tokens to better fit your flow.
 
 The `Verifier` middleware will look for a JWT token from:
+
 1. 'jwt' URI query parameter
 2. 'Authorization: BEARER T' request header
 3. Cookie 'jwt' value
