@@ -33,8 +33,10 @@ all unverified tokens, see jwtauth.Authenticator.
 package myservice
 
 import (
+	"fmt"
 	"net/http"
 
+	"github.com/dgrijalva/jwt-go"
 	"github.com/goware/jwtauth"
 	"github.com/pressly/chi"
 	"golang.org/x/net/context"
@@ -61,7 +63,9 @@ func router() http.Handler {
 		r.Use(jwtauth.Authenticator)
 
 		r.Get("/admin", func(ctx context.Context, w http.ResponseWriter, r *http.Request) {
-			w.Write([]byte("protected"))
+			token := ctx.Value("jwt").(*jwt.Token)
+			claims := token.Claims
+			w.Write([]byte(fmt.Printf("protected area. hi %v", claims["user_id"])))
 		})
 	})
 
@@ -74,7 +78,6 @@ func router() http.Handler {
 
 	return r
 }
-
 ```
 
 # LICENSE
