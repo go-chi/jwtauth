@@ -117,7 +117,7 @@ func (ja *JwtAuth) Verify(paramAliases ...string) func(chi.Handler) chi.Handler 
 				return
 			}
 
-			if !token.Valid || token.Method != ja.signer {
+			if token == nil || !token.Valid || token.Method != ja.signer {
 				err = ErrUnauthorized
 				ctx = ja.SetContext(ctx, token, err)
 				next.ServeHTTPC(ctx, w, r)
