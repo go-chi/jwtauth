@@ -54,6 +54,16 @@ func TestSimple(t *testing.T) {
 	if status, resp := testRequest(t, ts, "GET", "/", h, nil); status != 401 && resp != "Unauthorized\n" {
 		t.Fatalf(resp)
 	}
+	// wrong token secret and wrong alg
+	h.Set("Authorization", "BEARER "+newJwt512Token([]byte("wrong"), map[string]interface{}{}))
+	if status, resp := testRequest(t, ts, "GET", "/", h, nil); status != 401 && resp != "Unauthorized\n" {
+		t.Fatalf(resp)
+	}
+	// correct token secret but wrong alg
+	h.Set("Authorization", "BEARER "+newJwt512Token(TokenSecret, map[string]interface{}{}))
+	if status, resp := testRequest(t, ts, "GET", "/", h, nil); status != 401 && resp != "Unauthorized\n" {
+		t.Fatalf(resp)
+	}
 
 	// sending authorized requests
 	if status, resp := testRequest(t, ts, "GET", "/", newAuthHeader(), nil); status != 200 && resp != "welcome" {
@@ -127,6 +137,16 @@ func TestMore(t *testing.T) {
 	if status, resp := testRequest(t, ts, "GET", "/admin", h, nil); status != 401 && resp != "Unauthorized\n" {
 		t.Fatalf(resp)
 	}
+	// wrong token secret and wrong alg
+	h.Set("Authorization", "BEARER "+newJwt512Token([]byte("wrong"), map[string]interface{}{}))
+	if status, resp := testRequest(t, ts, "GET", "/admin", h, nil); status != 401 && resp != "Unauthorized\n" {
+		t.Fatalf(resp)
+	}
+	// correct token secret but wrong alg
+	h.Set("Authorization", "BEARER "+newJwt512Token(TokenSecret, map[string]interface{}{}))
+	if status, resp := testRequest(t, ts, "GET", "/admin", h, nil); status != 401 && resp != "Unauthorized\n" {
+		t.Fatalf(resp)
+	}
 
 	h = newAuthHeader((jwtauth.Claims{}).Set("exp", jwtauth.EpochNow()-1000))
 	if status, resp := testRequest(t, ts, "GET", "/admin", h, nil); status != 401 && resp != "expired\n" {
@@ -179,6 +199,21 @@ func testRequest(t *testing.T, ts *httptest.Server, method, path string, header 
 
 func newJwtToken(secret []byte, claims ...jwtauth.Claims) string {
 	token := jwt.New(jwt.GetSigningMethod("HS256"))
+	if len(claims) > 0 {
+		for k, v := range claims[0] {
+			token.Claims[k] = v
+		}
+	}
+	tokenStr, err := token.SignedString(secret)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return tokenStr
+}
+
+func newJwt512Token(secret []byte, claims ...jwtauth.Claims) string {
+	// use-case: when token is signed with a different alg than expected
+	token := jwt.New(jwt.GetSigningMethod("HS512"))
 	if len(claims) > 0 {
 		for k, v := range claims[0] {
 			token.Claims[k] = v
