@@ -106,12 +106,19 @@ func (ja *JwtAuth) Verify(paramAliases ...string) func(chi.Handler) chi.Handler 
 
 			// Verify the token
 			token, err := ja.Decode(tokenStr)
-			if err != nil || !token.Valid || token.Method != ja.signer {
+			if err != nil {
 				switch err.Error() {
 				case "token is expired":
 					err = ErrExpired
 				}
 
+				ctx = ja.SetContext(ctx, token, err)
+				next.ServeHTTPC(ctx, w, r)
+				return
+			}
+
+			if !token.Valid || token.Method != ja.signer {
+				err = ErrUnauthorized
 				ctx = ja.SetContext(ctx, token, err)
 				next.ServeHTTPC(ctx, w, r)
 				return
