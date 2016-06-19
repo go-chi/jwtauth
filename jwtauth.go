@@ -3,6 +3,7 @@ package jwtauth
 import (
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -22,6 +23,11 @@ type JwtAuth struct {
 	verifyKey []byte
 	signer    jwt.SigningMethod
 	parser    *jwt.Parser
+}
+
+type Token struct {
+	*jwt.Token
+	Claims Claims
 }
 
 // New creates a JwtAuth authenticator instance that provides middleware handlers
@@ -108,7 +114,7 @@ func (ja *JwtAuth) Verify(paramAliases ...string) func(chi.Handler) chi.Handler 
 			token, err := ja.Decode(tokenStr)
 			if err != nil {
 				switch err.Error() {
-				case "token is expired":
+				case "Token is expired":
 					err = ErrExpired
 				}
 
@@ -141,7 +147,12 @@ func (ja *JwtAuth) Verify(paramAliases ...string) func(chi.Handler) chi.Handler 
 }
 
 func (ja *JwtAuth) SetContext(ctx context.Context, t *jwt.Token, err error) context.Context {
-	ctx = context.WithValue(ctx, "jwt", t)
+	var jaToken *Token
+	if t != nil {
+		jaToken = &Token{Token: t, Claims: t.Claims.(Claims)}
+	}
+	_ = jaToken
+	ctx = context.WithValue(ctx, "jwt", jaToken)
 	ctx = context.WithValue(ctx, "jwt.err", err)
 	return ctx
 }
@@ -155,10 +166,31 @@ func (ja *JwtAuth) Encode(claims Claims) (t *jwt.Token, tokenString string, err 
 }
 
 func (ja *JwtAuth) Decode(tokenString string) (t *jwt.Token, err error) {
-	if ja.parser != nil {
-		return ja.parser.Parse(tokenString, ja.keyFunc)
+	// Decode the tokenString, but avoid using custom Claims via jwt-go's
+	// ParseWithClaims as the jwt-go types will cause some glitches, so easier
+	// to decode as MapClaims then wrap the underlying map[string]interface{}
+	// to our Claims type
+	// if ja.parser != nil {
+	// 	t, err = ja.parser.Parse(tokenString, ja.keyFunc)
+	// }
+	// t, err = jwt.Parse(tokenString, ja.keyFunc)
+	// if err != nil {
+	// 	log.Println("!!EERR", err)
+	// 	return nil, err
+	// }
+
+	t, err = jwt.ParseWithClaims(tokenString, Claims{}, ja.keyFunc)
+	if err != nil {
+		log.Println("!!EERR", err)
+		return nil, err
 	}
-	return jwt.Parse(tokenString, ja.keyFunc)
+
+	// Wrap type to jwtauth.Claims
+	// claims := Claims(t.Claims.(jwt.MapClaims))
+	// t.Claims = claims
+
+	return
+
 }
 
 func (ja *JwtAuth) keyFunc(t *jwt.Token) (interface{}, error) {
@@ -170,7 +202,9 @@ func (ja *JwtAuth) keyFunc(t *jwt.Token) (interface{}, error) {
 }
 
 func (ja *JwtAuth) IsExpired(t *jwt.Token) bool {
-	if expv, ok := t.Claims["exp"]; ok {
+	claims := t.Claims.(Claims)
+
+	if expv, ok := claims["exp"]; ok {
 		var exp int64
 		switch v := expv.(type) {
 		case float64:
@@ -203,7 +237,9 @@ func Authenticator(next chi.Handler) chi.Handler {
 			}
 		}
 
-		jwtToken, ok := ctx.Value("jwt").(*jwt.Token)
+		// jwtToken, ok := ctx.Value("jwt").(*jwt.Token)
+		jwtToken, ok := ctx.Value("jwt").(*Token)
+
 		if !ok || jwtToken == nil || !jwtToken.Valid {
 			http.Error(w, http.StatusText(401), 401)
 			return
@@ -216,6 +252,14 @@ func Authenticator(next chi.Handler) chi.Handler {
 
 // Claims is a convenience type to manage a JWT claims hash.
 type Claims map[string]interface{}
+
+// NOTE: as of v3.0 of jwt-go, Valid() interface method is called to verify
+// the claims. However, the current design we test these claims in the
+// Verifier middleware, so we skip this step. Now with v3.0, there is
+// some potential for some minor improvements to our design.
+func (c Claims) Valid() error {
+	return nil
+}
 
 func (c Claims) Set(k string, v interface{}) Claims {
 	c[k] = v

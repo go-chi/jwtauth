@@ -197,12 +197,10 @@ func testRequest(t *testing.T, ts *httptest.Server, method, path string, header 
 	return resp.StatusCode, string(respBody)
 }
 
-func newJwtToken(secret []byte, claims ...jwtauth.Claims) string {
+func newJwtToken(secret []byte, optClaims ...jwtauth.Claims) string {
 	token := jwt.New(jwt.GetSigningMethod("HS256"))
-	if len(claims) > 0 {
-		for k, v := range claims[0] {
-			token.Claims[k] = v
-		}
+	if len(optClaims) > 0 {
+		token.Claims = optClaims[0]
 	}
 	tokenStr, err := token.SignedString(secret)
 	if err != nil {
@@ -211,13 +209,11 @@ func newJwtToken(secret []byte, claims ...jwtauth.Claims) string {
 	return tokenStr
 }
 
-func newJwt512Token(secret []byte, claims ...jwtauth.Claims) string {
+func newJwt512Token(secret []byte, optClaims ...jwtauth.Claims) string {
 	// use-case: when token is signed with a different alg than expected
 	token := jwt.New(jwt.GetSigningMethod("HS512"))
-	if len(claims) > 0 {
-		for k, v := range claims[0] {
-			token.Claims[k] = v
-		}
+	if len(optClaims) > 0 {
+		token.Claims = optClaims[0]
 	}
 	tokenStr, err := token.SignedString(secret)
 	if err != nil {
@@ -226,8 +222,8 @@ func newJwt512Token(secret []byte, claims ...jwtauth.Claims) string {
 	return tokenStr
 }
 
-func newAuthHeader(claims ...jwtauth.Claims) http.Header {
+func newAuthHeader(optClaims ...jwtauth.Claims) http.Header {
 	h := http.Header{}
-	h.Set("Authorization", "BEARER "+newJwtToken(TokenSecret, claims...))
+	h.Set("Authorization", "BEARER "+newJwtToken(TokenSecret, optClaims...))
 	return h
 }
