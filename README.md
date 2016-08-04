@@ -1,8 +1,11 @@
-jwtauth - JWT middleware for Go HTTP services
-=============================================
+jwtauth - JWT middleware for Go 1.7+ HTTP services
+==================================================
 
 The `jwtauth` middleware is a simple way to verify a JWT token from a request
 and send the result down the request context (`context.Context`).
+
+This package uses the new `context` package in Go 1.7 also used by `net/http`
+to manage request contexts.
 
 In a complete JWT-authentication sequence, you'll first capture the token from
 a request, decode it, verify and then validate that is correctly signed and hasn't
@@ -63,7 +66,8 @@ func router() http.Handler {
 		// and tweak it, its not scary.
 		r.Use(jwtauth.Authenticator)
 
-		r.Get("/admin", func(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+		r.Get("/admin", func(w http.ResponseWriter, r *http.Request) {
+			ctx := r.Context()
 			token := ctx.Value("jwt").(*jwt.Token)
 			claims := token.Claims
 			w.Write([]byte(fmt.Printf("protected area. hi %v", claims["user_id"])))
@@ -72,7 +76,7 @@ func router() http.Handler {
 
 	// Public routes
 	r.Group(func(r chi.Router) {
-		r.Get("/", func(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+		r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 			w.Write([]byte("welcome"))
 		})
 	})
