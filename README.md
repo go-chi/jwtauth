@@ -28,6 +28,10 @@ the "jwt" and "jwt.err" in the context and respond to the client accordingly. A 
 Authenticator middleware is provided by this package, that will return a 401 message for
 all unverified tokens, see jwtauth.Authenticator.
 
+NOTE: This package has been updated to support the latest version of the
+underlying jwt library, github.com/dgrijalva/jwt-go. If you run into problems,
+make sure to update to the latest version of jwt-go.
+
 # Usage
 
 ```go

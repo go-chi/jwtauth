@@ -1,15 +1,15 @@
 package jwtauth
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
-	"github.com/pressly/chi"
-	"golang.org/x/net/context"
 )
 
 var (
@@ -22,6 +22,11 @@ type JwtAuth struct {
 	verifyKey []byte
 	signer    jwt.SigningMethod
 	parser    *jwt.Parser
+}
+
+type Token struct {
+	*jwt.Token
+	Claims Claims
 }
 
 // New creates a JwtAuth authenticator instance that provides middleware handlers
@@ -59,13 +64,13 @@ func NewWithParser(alg string, parser *jwt.Parser, signKey []byte, verifyKey []b
 // and respond to the client accordingly. A generic Authenticator
 // middleware is provided by this package, that will return a 401
 // message for all unverified tokens, see jwtauth.Authenticator.
-func (ja *JwtAuth) Verifier(next chi.Handler) chi.Handler {
+func (ja *JwtAuth) Verifier(next http.Handler) http.Handler {
 	return ja.Verify("")(next)
 }
 
-func (ja *JwtAuth) Verify(paramAliases ...string) func(chi.Handler) chi.Handler {
-	return func(next chi.Handler) chi.Handler {
-		hfn := func(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+func (ja *JwtAuth) Verify(paramAliases ...string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		hfn := func(w http.ResponseWriter, r *http.Request) {
 
 			var tokenStr string
 			var err error
@@ -104,23 +109,26 @@ func (ja *JwtAuth) Verify(paramAliases ...string) func(chi.Handler) chi.Handler 
 				err = ErrUnauthorized
 			}
 
+			// The request context
+			ctx := r.Context()
+
 			// Verify the token
 			token, err := ja.Decode(tokenStr)
 			if err != nil {
 				switch err.Error() {
-				case "token is expired":
+				case "Token is expired":
 					err = ErrExpired
 				}
 
 				ctx = ja.SetContext(ctx, token, err)
-				next.ServeHTTPC(ctx, w, r)
+				next.ServeHTTP(w, r.WithContext(ctx))
 				return
 			}
 
 			if token == nil || !token.Valid || token.Method != ja.signer {
 				err = ErrUnauthorized
 				ctx = ja.SetContext(ctx, token, err)
-				next.ServeHTTPC(ctx, w, r)
+				next.ServeHTTP(w, r.WithContext(ctx))
 				return
 			}
 
@@ -128,20 +136,25 @@ func (ja *JwtAuth) Verify(paramAliases ...string) func(chi.Handler) chi.Handler 
 			if ja.IsExpired(token) {
 				err = ErrExpired
 				ctx = ja.SetContext(ctx, token, err)
-				next.ServeHTTPC(ctx, w, r)
+				next.ServeHTTP(w, r.WithContext(ctx))
 				return
 			}
 
 			// Valid! pass it down the context to an authenticator middleware
 			ctx = ja.SetContext(ctx, token, err)
-			next.ServeHTTPC(ctx, w, r)
+			next.ServeHTTP(w, r.WithContext(ctx))
 		}
-		return chi.HandlerFunc(hfn)
+		return http.HandlerFunc(hfn)
 	}
 }
 
 func (ja *JwtAuth) SetContext(ctx context.Context, t *jwt.Token, err error) context.Context {
-	ctx = context.WithValue(ctx, "jwt", t)
+	var jaToken *Token
+	if t != nil {
+		jaToken = &Token{Token: t, Claims: t.Claims.(Claims)}
+	}
+	_ = jaToken
+	ctx = context.WithValue(ctx, "jwt", jaToken)
 	ctx = context.WithValue(ctx, "jwt.err", err)
 	return ctx
 }
@@ -155,10 +168,31 @@ func (ja *JwtAuth) Encode(claims Claims) (t *jwt.Token, tokenString string, err 
 }
 
 func (ja *JwtAuth) Decode(tokenString string) (t *jwt.Token, err error) {
-	if ja.parser != nil {
-		return ja.parser.Parse(tokenString, ja.keyFunc)
+	// Decode the tokenString, but avoid using custom Claims via jwt-go's
+	// ParseWithClaims as the jwt-go types will cause some glitches, so easier
+	// to decode as MapClaims then wrap the underlying map[string]interface{}
+	// to our Claims type
+	// if ja.parser != nil {
+	// 	t, err = ja.parser.Parse(tokenString, ja.keyFunc)
+	// }
+	// t, err = jwt.Parse(tokenString, ja.keyFunc)
+	// if err != nil {
+	// 	log.Println("!!EERR", err)
+	// 	return nil, err
+	// }
+
+	t, err = jwt.ParseWithClaims(tokenString, Claims{}, ja.keyFunc)
+	if err != nil {
+		log.Println("!!EERR", err)
+		return nil, err
 	}
-	return jwt.Parse(tokenString, ja.keyFunc)
+
+	// Wrap type to jwtauth.Claims
+	// claims := Claims(t.Claims.(jwt.MapClaims))
+	// t.Claims = claims
+
+	return
+
 }
 
 func (ja *JwtAuth) keyFunc(t *jwt.Token) (interface{}, error) {
@@ -170,7 +204,9 @@ func (ja *JwtAuth) keyFunc(t *jwt.Token) (interface{}, error) {
 }
 
 func (ja *JwtAuth) IsExpired(t *jwt.Token) bool {
-	if expv, ok := t.Claims["exp"]; ok {
+	claims := t.Claims.(Claims)
+
+	if expv, ok := claims["exp"]; ok {
 		var exp int64
 		switch v := expv.(type) {
 		case float64:
@@ -194,8 +230,10 @@ func (ja *JwtAuth) IsExpired(t *jwt.Token) bool {
 // the Verifier middleware. The Authenticator sends a 401 Unauthorized response for
 // all unverified tokens and passes the good ones through. It's just fine until you
 // decide to write something similar and customize your client response.
-func Authenticator(next chi.Handler) chi.Handler {
-	return chi.HandlerFunc(func(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+func Authenticator(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+
 		if jwtErr, ok := ctx.Value("jwt.err").(error); ok {
 			if jwtErr != nil {
 				http.Error(w, http.StatusText(401), 401)
@@ -203,19 +241,29 @@ func Authenticator(next chi.Handler) chi.Handler {
 			}
 		}
 
-		jwtToken, ok := ctx.Value("jwt").(*jwt.Token)
+		// jwtToken, ok := ctx.Value("jwt").(*jwt.Token)
+		jwtToken, ok := ctx.Value("jwt").(*Token)
+
 		if !ok || jwtToken == nil || !jwtToken.Valid {
 			http.Error(w, http.StatusText(401), 401)
 			return
 		}
 
 		// Token is authenticated, pass it through
-		next.ServeHTTPC(ctx, w, r)
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
 // Claims is a convenience type to manage a JWT claims hash.
 type Claims map[string]interface{}
+
+// NOTE: as of v3.0 of jwt-go, Valid() interface method is called to verify
+// the claims. However, the current design we test these claims in the
+// Verifier middleware, so we skip this step. Now with v3.0, there is
+// some potential for some minor improvements to our design.
+func (c Claims) Valid() error {
+	return nil
+}
 
 func (c Claims) Set(k string, v interface{}) Claims {
 	c[k] = v
