@@ -1,6 +1,7 @@
 package jwtauth
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log"
@@ -9,8 +10,6 @@ import (
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
-	"github.com/pressly/chi"
-	"golang.org/x/net/context"
 )
 
 var (
@@ -65,13 +64,13 @@ func NewWithParser(alg string, parser *jwt.Parser, signKey []byte, verifyKey []b
 // and respond to the client accordingly. A generic Authenticator
 // middleware is provided by this package, that will return a 401
 // message for all unverified tokens, see jwtauth.Authenticator.
-func (ja *JwtAuth) Verifier(next chi.Handler) chi.Handler {
+func (ja *JwtAuth) Verifier(next http.Handler) http.Handler {
 	return ja.Verify("")(next)
 }
 
-func (ja *JwtAuth) Verify(paramAliases ...string) func(chi.Handler) chi.Handler {
-	return func(next chi.Handler) chi.Handler {
-		hfn := func(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+func (ja *JwtAuth) Verify(paramAliases ...string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		hfn := func(w http.ResponseWriter, r *http.Request) {
 
 			var tokenStr string
 			var err error
@@ -110,6 +109,9 @@ func (ja *JwtAuth) Verify(paramAliases ...string) func(chi.Handler) chi.Handler 
 				err = ErrUnauthorized
 			}
 
+			// The request context
+			ctx := r.Context()
+
 			// Verify the token
 			token, err := ja.Decode(tokenStr)
 			if err != nil {
@@ -119,14 +121,14 @@ func (ja *JwtAuth) Verify(paramAliases ...string) func(chi.Handler) chi.Handler 
 				}
 
 				ctx = ja.SetContext(ctx, token, err)
-				next.ServeHTTPC(ctx, w, r)
+				next.ServeHTTP(w, r.WithContext(ctx))
 				return
 			}
 
 			if token == nil || !token.Valid || token.Method != ja.signer {
 				err = ErrUnauthorized
 				ctx = ja.SetContext(ctx, token, err)
-				next.ServeHTTPC(ctx, w, r)
+				next.ServeHTTP(w, r.WithContext(ctx))
 				return
 			}
 
@@ -134,15 +136,15 @@ func (ja *JwtAuth) Verify(paramAliases ...string) func(chi.Handler) chi.Handler 
 			if ja.IsExpired(token) {
 				err = ErrExpired
 				ctx = ja.SetContext(ctx, token, err)
-				next.ServeHTTPC(ctx, w, r)
+				next.ServeHTTP(w, r.WithContext(ctx))
 				return
 			}
 
 			// Valid! pass it down the context to an authenticator middleware
 			ctx = ja.SetContext(ctx, token, err)
-			next.ServeHTTPC(ctx, w, r)
+			next.ServeHTTP(w, r.WithContext(ctx))
 		}
-		return chi.HandlerFunc(hfn)
+		return http.HandlerFunc(hfn)
 	}
 }
 
@@ -228,8 +230,10 @@ func (ja *JwtAuth) IsExpired(t *jwt.Token) bool {
 // the Verifier middleware. The Authenticator sends a 401 Unauthorized response for
 // all unverified tokens and passes the good ones through. It's just fine until you
 // decide to write something similar and customize your client response.
-func Authenticator(next chi.Handler) chi.Handler {
-	return chi.HandlerFunc(func(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+func Authenticator(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+
 		if jwtErr, ok := ctx.Value("jwt.err").(error); ok {
 			if jwtErr != nil {
 				http.Error(w, http.StatusText(401), 401)
@@ -246,7 +250,7 @@ func Authenticator(next chi.Handler) chi.Handler {
 		}
 
 		// Token is authenticated, pass it through
-		next.ServeHTTPC(ctx, w, r)
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
