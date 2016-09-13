@@ -38,8 +38,10 @@ all unverified tokens, see jwtauth.Authenticator.
 
 # Usage
 
+See the full [example](https://github.com/goware/jwtauth/blob/master/_example/main.go).
+
 ```go
-package myservice
+package main
 
 import (
 	"fmt"
@@ -75,14 +77,14 @@ func router() http.Handler {
 			ctx := r.Context()
 			token := ctx.Value("jwt").(*jwt.Token)
 			claims := token.Claims
-			w.Write([]byte(fmt.Printf("protected area. hi %v", claims["user_id"])))
+			w.Write([]byte(fmt.Sprintf("protected area. hi %v", claims["user_id"])))
 		})
 	})
 
 	// Public routes
 	r.Group(func(r chi.Router) {
 		r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-			w.Write([]byte("welcome"))
+			w.Write([]byte("welcome anonymous"))
 		})
 	})
 
