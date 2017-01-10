@@ -76,7 +76,7 @@ func router() http.Handler {
 		r.Get("/admin", func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
 			token := ctx.Value("jwt").(*jwt.Token)
-			claims := token.Claims
+			claims := token.Claims.(jwt.MapClaims)
 			w.Write([]byte(fmt.Sprintf("protected area. hi %v", claims["user_id"])))
 		})
 	})

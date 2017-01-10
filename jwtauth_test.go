@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aguzun/jwtauth"
 	"github.com/dgrijalva/jwt-go"
-	"github.com/goware/jwtauth"
 	"github.com/pressly/chi"
 )
 
@@ -202,7 +202,7 @@ func newJwtToken(secret []byte, claims ...jwtauth.Claims) string {
 	token := jwt.New(jwt.GetSigningMethod("HS256"))
 	if len(claims) > 0 {
 		for k, v := range claims[0] {
-			token.Claims[k] = v
+			token.Claims.(jwt.MapClaims)[k] = v
 		}
 	}
 	tokenStr, err := token.SignedString(secret)
@@ -217,7 +217,7 @@ func newJwt512Token(secret []byte, claims ...jwtauth.Claims) string {
 	token := jwt.New(jwt.GetSigningMethod("HS512"))
 	if len(claims) > 0 {
 		for k, v := range claims[0] {
-			token.Claims[k] = v
+			token.Claims.(jwt.MapClaims)[k] = v
 		}
 	}
 	tokenStr, err := token.SignedString(secret)

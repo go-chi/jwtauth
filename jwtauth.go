@@ -124,7 +124,9 @@ func (ja *JwtAuth) Verify(paramAliases ...string) func(http.Handler) http.Handle
 			}
 
 			// Check expiry via "exp" claim
-			if ja.IsExpired(token) {
+			err = token.Claims.Valid()
+			// Check expiry via "exp" claim
+			if err != nil {
 				err = ErrExpired
 				ctx = ja.SetContext(ctx, token, err)
 				next.ServeHTTP(w, r.WithContext(ctx))
@@ -147,7 +149,7 @@ func (ja *JwtAuth) SetContext(ctx context.Context, t *jwt.Token, err error) cont
 
 func (ja *JwtAuth) Encode(claims Claims) (t *jwt.Token, tokenString string, err error) {
 	t = jwt.New(ja.signer)
-	t.Claims = claims
+	t.Claims = toMapClaims(claims)
 	tokenString, err = t.SignedString(ja.signKey)
 	t.Raw = tokenString
 	return
@@ -169,7 +171,7 @@ func (ja *JwtAuth) keyFunc(t *jwt.Token) (interface{}, error) {
 }
 
 func (ja *JwtAuth) IsExpired(t *jwt.Token) bool {
-	if expv, ok := t.Claims["exp"]; ok {
+	if expv, ok := t.Claims.(jwt.MapClaims)["exp"]; ok {
 		var exp int64
 		switch v := expv.(type) {
 		case float64:
@@ -261,4 +263,13 @@ func EpochNow() int64 {
 // Helper function to return calculated time in the future for "exp" claim.
 func ExpireIn(tm time.Duration) int64 {
 	return EpochNow() + int64(tm.Seconds())
+}
+
+// Helper function to build jwt.MapClaims from convenience type Claims.
+func toMapClaims(claims Claims) jwt.MapClaims {
+	c := jwt.MapClaims{}
+	for k, v := range claims {
+		c[k] = v
+	}
+	return c
 }
