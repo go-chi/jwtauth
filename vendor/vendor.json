@@ -3,13 +3,13 @@
 	"ignore": "test",
 	"package": [
 		{
-			"checksumSHA1": "CMfwCFcZRDJeIVVbIHa6t4Aewl8=",
+          "checksumSHA1": "PcdItMMwb39o55X5JulfTDLGOKE=",
 			"path": "github.com/dgrijalva/jwt-go",
-			"revision": "268038b363c7a8d7306b8e35bf77a1fde4b0c402",
-			"revisionTime": "2016-06-16T19:14:24Z",
-			"version": "v2.7.0",
-			"versionExact": "v2.7.0"
+          "revision": "a601269ab70c205d26370c16f7c81e9017c14e04",
+          "revisionTime": "2017-01-04T18:22:50Z",
+          "version": "v3.0.0",
+          "versionExact": "v3.0.0"
 		}
 	],
-	"rootPath": "github.com/goware/jwtauth"
+  "rootPath": "github.com/aguzun/jwtauth"
 }
