@@ -14,6 +14,7 @@ import (
 var (
 	ErrUnauthorized = errors.New("jwtauth: unauthorized token")
 	ErrExpired      = errors.New("jwtauth: expired token")
+	ErrInvalidToken = errors.New("jwtauth: invalid or missing token")
 )
 
 type JwtAuth struct {
@@ -197,22 +198,34 @@ func Authenticator(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
-		if jwtErr, ok := ctx.Value("jwt.err").(error); ok {
-			if jwtErr != nil {
-				http.Error(w, http.StatusText(401), 401)
-				return
-			}
-		}
-
-		jwtToken, ok := ctx.Value("jwt").(*jwt.Token)
-		if !ok || jwtToken == nil || !jwtToken.Valid {
+		jwtToken, err := TokenFromContext(ctx)
+		if err != nil {
 			http.Error(w, http.StatusText(401), 401)
 			return
 		}
 
+		_ = jwtToken
+
 		// Token is authenticated, pass it through
 		next.ServeHTTP(w, r)
 	})
+}
+
+//TokenFromContext returns a jwt.Token from a given context. If the token is unable
+// to be decoded, is nil, or is invalid, it returns an ErrInvalidToken error.
+// This function is provided as a convenience for custom Authorization middleware.
+func TokenFromContext(ctx context.Context) (jwt.Token, error) {
+	if jwtErr, ok := ctx.Value("jwt.err").(error); ok {
+		if jwtErr != nil {
+			return jwt.Token{}, jwtErr
+		}
+	}
+
+	jwtToken, ok := ctx.Value("jwt").(*jwt.Token)
+	if !ok || jwtToken == nil || !jwtToken.Valid {
+		return jwt.Token{}, ErrInvalidToken
+	}
+	return *jwtToken, nil
 }
 
 // Claims is a convenience type to manage a JWT claims hash.

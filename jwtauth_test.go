@@ -81,26 +81,22 @@ func TestMore(t *testing.T) {
 			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				ctx := r.Context()
 
-				if jwtErr, ok := ctx.Value("jwt.err").(error); ok {
-					switch jwtErr {
-					default:
-						http.Error(w, http.StatusText(401), 401)
-						return
-					case jwtauth.ErrExpired:
-						http.Error(w, "expired", 401)
-						return
-					case jwtauth.ErrUnauthorized:
-						http.Error(w, http.StatusText(401), 401)
-						return
-					case nil:
-						// no error
-					}
-				}
-
-				jwtToken, ok := ctx.Value("jwt").(*jwt.Token)
-				if !ok || jwtToken == nil || !jwtToken.Valid {
+				_, err := jwtauth.TokenFromContext(ctx)
+				switch err {
+				default:
 					http.Error(w, http.StatusText(401), 401)
 					return
+				case jwtauth.ErrExpired:
+					http.Error(w, "expired", 401)
+					return
+				case jwtauth.ErrUnauthorized:
+					http.Error(w, http.StatusText(401), 401)
+					return
+				case jwtauth.ErrInvalidToken:
+					http.Error(w, http.StatusText(401), 401)
+					return
+				case nil:
+					// no error
 				}
 
 				// Token is authenticated, pass it through
