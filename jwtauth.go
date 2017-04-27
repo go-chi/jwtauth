@@ -82,19 +82,19 @@ func (ja *JwtAuth) Verify(paramAliases ...string) func(http.Handler) http.Handle
 				}
 			}
 
-			// Get token from authorization header
-			if tokenStr == "" {
-				bearer := r.Header.Get("Authorization")
-				if len(bearer) > 7 && strings.ToUpper(bearer[0:6]) == "BEARER" {
-					tokenStr = bearer[7:]
-				}
-			}
-
 			// Get token from cookie
 			if tokenStr == "" {
 				cookie, err := r.Cookie("jwt")
 				if err == nil {
 					tokenStr = cookie.Value
+				}
+			}
+
+			// Get token from authorization header
+			if tokenStr == "" {
+				bearer := r.Header.Get("Authorization")
+				if len(bearer) > 7 && strings.ToUpper(bearer[0:6]) == "BEARER" {
+					tokenStr = bearer[7:]
 				}
 			}
 
