@@ -100,4 +100,4 @@ func router() http.Handler {
 
 # LICENSE
 
-MIT
+[MIT](/LICENSE)
