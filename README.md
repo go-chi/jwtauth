@@ -1,44 +1,43 @@
 jwtauth - JWT middleware for Go 1.7+ HTTP services
 ==================================================
 
-The `jwtauth` middleware is a simple way to verify a JWT token from a request
-and send the result down the request context (`context.Context`).
+The `jwtauth` http middleware package provides a simple way to verify a JWT token
+from a http request and send the result down the request context (`context.Context`).
 
-**NOTE:** `jwtauth` requires [v2.7.0](https://github.com/dgrijalva/jwt-go/tree/v2.7.0) of the
-`github.com/dgrijalva/jwt-go` dependency. Please make sure to vendor the correct version
-into your project. There is a PR https://github.com/goware/jwtauth/pull/8 to support v3.0.0,
-and it's quite close, but it needs another review after recent updates to jwt-go.
+This package uses the new `context` package in Go 1.7 stdlib and [net/http#Request.Context](https://golang.org/pkg/net/http/#Request.Context) to pass values between handler chains.
 
-This package uses the new `context` package in Go 1.7 also used by `net/http`
-to manage request contexts.
+In a complete JWT-authentication flow, you'll first capture the token from a http
+request, decode it, verify it and then validate that its correctly signed and hasn't
+expired - the `jwtauth.Verifier` middleware handler takes care of all of that. The 
+`jwtauth.Verifier` will set the context values on keys `jwtauth.TokenCtxKey` and
+`jwtauth.ErrorCtxKey`.
 
-In a complete JWT-authentication sequence, you'll first capture the token from
-a request, decode it, verify and then validate that is correctly signed and hasn't
-expired - the `jwtauth.Verifier` middleware handler takes care of all of that. Next,
-it's up to an authentication handler to determine what to do with a valid or invalid
-token. The `jwtauth.Authenticator` is a provided authentication middleware to enforce
-access following the `Verifier`. The `Authenticator` sends a 401 Unauthorized response
-for all unverified tokens and passes the good ones through. You can also copy the
-Authenticator and customize it to handle invalid tokens to better fit your flow.
+Next, it's up to an authentication handler to respond or continue processing after the 
+`jwtauth.Verifier`. The `jwtauth.Authenticator` middleware responds with a 401 Unauthorized
+plain-text payload for all unverified tokens and passes the good ones through. You can
+also copy the Authenticator and customize it to handle invalid tokens to better fit
+your flow (ie. with a JSON error response body).
 
-The `Verifier` middleware will look for a JWT token from:
+The `Verifier` will search for a JWT token in a http request, in the order:
 
 1. 'jwt' URI query parameter
 2. 'Authorization: BEARER T' request header
 3. Cookie 'jwt' value
-4. (optional), use `jwtauth.Verify("state")` for additional query parameter aliases
+4. (optional), use `jwtauth.Verify("state")` for additional query/cookie parameter aliases
 
-The verification processes finishes here and sets the token and a error in the request
-context and calls the next handler.
+The first JWT string that is found as a query parameter, authorization header
+or cookie header is then decoded by the `jwt-go` library and a *jwt.Token
+object is set on the request context. In the case of a signature decoding error
+the Verifier will also set the error on the request context.
 
-Make sure to have your own handler following the Validator that will check the value of
-the "jwt" and "jwt.err" in the context and respond to the client accordingly. A generic
-Authenticator middleware is provided by this package, that will return a 401 message for
-all unverified tokens, see jwtauth.Authenticator.
+The Verifier always calls the next http handler in sequence, which can either
+be the generic `jwtauth.Authenticator` middleware or your own custom handler
+which checks the request context jwt token and error to prepare a custom
+http response.
 
 # Usage
 
-See the full [example](https://github.com/goware/jwtauth/blob/master/_example/main.go).
+See the full [example](https://github.com/go-chi/jwtauth/blob/master/_example/main.go).
 
 ```go
 package main
@@ -47,16 +46,25 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/dgrijalva/jwt-go"
-	"github.com/goware/jwtauth"
-	"github.com/pressly/chi"
-	"golang.org/x/net/context"
+	"github.com/go-chi/chi"
+	"github.com/go-chi/jwtauth"
 )
 
 var TokenAuth *jwtauth.JwtAuth
 
 func init() {
 	TokenAuth = jwtauth.New("HS256", []byte("secret"), nil)
+
+	// For debugging/example purposes, we generate and print
+	// a sample jwt token with claims `user_id:123` here:
+	_, tokenString, _ := TokenAuth.Encode(jwtauth.Claims{"user_id": 123})
+	fmt.Printf("DEBUG: a sample jwt is %s\n\n", tokenString)
+}
+
+func main() {
+	addr := ":3333"
+	fmt.Printf("Starting server on %v\n", addr)
+	http.ListenAndServe(addr, router())
 }
 
 func router() http.Handler {
@@ -74,9 +82,7 @@ func router() http.Handler {
 		r.Use(jwtauth.Authenticator)
 
 		r.Get("/admin", func(w http.ResponseWriter, r *http.Request) {
-			ctx := r.Context()
-			token := ctx.Value("jwt").(*jwt.Token)
-			claims := token.Claims
+			_, claims, _ := jwtauth.TokenContext(r.Context())
 			w.Write([]byte(fmt.Sprintf("protected area. hi %v", claims["user_id"])))
 		})
 	})

@@ -62,9 +62,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/dgrijalva/jwt-go"
-	"github.com/goware/jwtauth"
-	"github.com/pressly/chi"
+	"github.com/go-chi/chi"
+	"github.com/go-chi/jwtauth"
 )
 
 var TokenAuth *jwtauth.JwtAuth
@@ -99,9 +98,7 @@ func router() http.Handler {
 		r.Use(jwtauth.Authenticator)
 
 		r.Get("/admin", func(w http.ResponseWriter, r *http.Request) {
-			ctx := r.Context()
-			token := ctx.Value("jwt").(*jwt.Token)
-			claims := token.Claims
+			_, claims, _ := jwtauth.TokenContext(r.Context())
 			w.Write([]byte(fmt.Sprintf("protected area. hi %v", claims["user_id"])))
 		})
 	})
