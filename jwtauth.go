@@ -66,12 +66,14 @@ func NewWithParser(alg string, parser *jwt.Parser, signKey []byte, verifyKey []b
 // be the generic `jwtauth.Authenticator` middleware or your own custom handler
 // which checks the request context jwt token and error to prepare a custom
 // http response.
-func (ja *JwtAuth) Verifier(next http.Handler) http.Handler {
-	return ja.Verify("")(next)
+func Verifier(ja *JwtAuth) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return Verify(ja, "")(next)
+	}
 }
 
 // TODO: explain
-func (ja *JwtAuth) Verify(paramAliases ...string) func(http.Handler) http.Handler {
+func Verify(ja *JwtAuth, paramAliases ...string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		hfn := func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()

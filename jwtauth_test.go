@@ -31,7 +31,7 @@ func init() {
 func TestSimple(t *testing.T) {
 	r := chi.NewRouter()
 
-	r.Use(TokenAuth.Verifier, jwtauth.Authenticator)
+	r.Use(jwtauth.Verifier(TokenAuth), jwtauth.Authenticator)
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("welcome"))
@@ -76,7 +76,7 @@ func TestMore(t *testing.T) {
 
 	// Protected routes
 	r.Group(func(r chi.Router) {
-		r.Use(TokenAuth.Verifier)
+		r.Use(jwtauth.Verifier(TokenAuth))
 
 		authenticator := func(next http.Handler) http.Handler {
 			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

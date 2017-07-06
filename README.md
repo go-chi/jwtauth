@@ -77,7 +77,7 @@ func router() http.Handler {
 	// Protected routes
 	r.Group(func(r chi.Router) {
 		// Seek, verify and validate JWT tokens
-		r.Use(tokenAuth.Verifier)
+		r.Use(jwtauth.Verifier(tokenAuth))
 
 		// Handle valid / invalid tokens. In this example, we use
 		// the provided authenticator middleware, but you can write your
