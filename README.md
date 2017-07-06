@@ -4,6 +4,10 @@ jwtauth - JWT authentication middleware for Go HTTP services
 The `jwtauth` http middleware package provides a simple way to verify a JWT token
 from a http request and send the result down the request context (`context.Context`).
 
+Please note, `jwtauth` works with any Go http router, but resides under the go-chi group
+for maintenance and organization - its only 3rd party dependency is the underlying jwt library
+"github.com/dgrijalva/jwt-go".
+
 This package uses the new `context` package in Go 1.7 stdlib and [net/http#Request.Context](https://golang.org/pkg/net/http/#Request.Context) to pass values between handler chains.
 
 In a complete JWT-authentication flow, you'll first capture the token from a http
