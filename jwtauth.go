@@ -152,7 +152,7 @@ func (ja *JwtAuth) Verify(paramAliases ...string) func(http.Handler) http.Handle
 // until you decide to write something similar and customize your client response.
 func Authenticator(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		token, _, err := TokenContext(r.Context())
+		token, _, err := FromContext(r.Context())
 
 		if err != nil {
 			http.Error(w, http.StatusText(401), 401)
@@ -169,7 +169,7 @@ func Authenticator(next http.Handler) http.Handler {
 	})
 }
 
-func TokenContext(ctx context.Context) (*jwt.Token, Claims, error) {
+func FromContext(ctx context.Context) (*jwt.Token, Claims, error) {
 	token, _ := ctx.Value(TokenCtxKey).(*jwt.Token)
 
 	var claims Claims

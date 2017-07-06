@@ -80,7 +80,7 @@ func TestMore(t *testing.T) {
 
 		authenticator := func(next http.Handler) http.Handler {
 			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				token, _, err := jwtauth.TokenContext(r.Context())
+				token, _, err := jwtauth.FromContext(r.Context())
 
 				if err != nil {
 					switch err {
@@ -110,7 +110,7 @@ func TestMore(t *testing.T) {
 		r.Use(authenticator)
 
 		r.Get("/admin", func(w http.ResponseWriter, r *http.Request) {
-			_, claims, err := jwtauth.TokenContext(r.Context())
+			_, claims, err := jwtauth.FromContext(r.Context())
 
 			if err != nil {
 				w.Write([]byte(fmt.Sprintf("error! %v", err)))

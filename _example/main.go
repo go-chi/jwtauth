@@ -66,14 +66,14 @@ import (
 	"github.com/go-chi/jwtauth"
 )
 
-var TokenAuth *jwtauth.JwtAuth
+var tokenAuth *jwtauth.JwtAuth
 
 func init() {
-	TokenAuth = jwtauth.New("HS256", []byte("secret"), nil)
+	tokenAuth = jwtauth.New("HS256", []byte("secret"), nil)
 
 	// For debugging/example purposes, we generate and print
 	// a sample jwt token with claims `user_id:123` here:
-	_, tokenString, _ := TokenAuth.Encode(jwtauth.Claims{"user_id": 123})
+	_, tokenString, _ := tokenAuth.Encode(jwtauth.Claims{"user_id": 123})
 	fmt.Printf("DEBUG: a sample jwt is %s\n\n", tokenString)
 }
 
@@ -89,7 +89,7 @@ func router() http.Handler {
 	// Protected routes
 	r.Group(func(r chi.Router) {
 		// Seek, verify and validate JWT tokens
-		r.Use(TokenAuth.Verifier)
+		r.Use(tokenAuth.Verifier)
 
 		// Handle valid / invalid tokens. In this example, we use
 		// the provided authenticator middleware, but you can write your
@@ -98,7 +98,7 @@ func router() http.Handler {
 		r.Use(jwtauth.Authenticator)
 
 		r.Get("/admin", func(w http.ResponseWriter, r *http.Request) {
-			_, claims, _ := jwtauth.TokenContext(r.Context())
+			_, claims, _ := jwtauth.FromContext(r.Context())
 			w.Write([]byte(fmt.Sprintf("protected area. hi %v", claims["user_id"])))
 		})
 	})
