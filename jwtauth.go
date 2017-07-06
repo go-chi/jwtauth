@@ -118,76 +118,32 @@ func (ja *JwtAuth) Verify(paramAliases ...string) func(http.Handler) http.Handle
 					err = ErrExpired
 				}
 
-				ctx = ja.SetContext(ctx, token, err)
+				ctx = NewContext(ctx, token, err)
 				next.ServeHTTP(w, r.WithContext(ctx))
 				return
 			}
 
 			if token == nil || !token.Valid || token.Method != ja.signer {
 				err = ErrUnauthorized
-				ctx = ja.SetContext(ctx, token, err)
+				ctx = NewContext(ctx, token, err)
 				next.ServeHTTP(w, r.WithContext(ctx))
 				return
 			}
 
 			// Check expiry via "exp" claim
-			if ja.IsExpired(token) {
+			if IsExpired(token) {
 				err = ErrExpired
-				ctx = ja.SetContext(ctx, token, err)
+				ctx = NewContext(ctx, token, err)
 				next.ServeHTTP(w, r.WithContext(ctx))
 				return
 			}
 
 			// Valid! pass it down the context to an authenticator middleware
-			ctx = ja.SetContext(ctx, token, err)
+			ctx = NewContext(ctx, token, err)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		}
 		return http.HandlerFunc(hfn)
 	}
-}
-
-// Authenticator is a default authentication middleware to enforce access from the
-// Verifier middleware request context values. The Authenticator sends a 401 Unauthorized
-// response for any unverified tokens and passes the good ones through. It's just fine
-// until you decide to write something similar and customize your client response.
-func Authenticator(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		token, _, err := FromContext(r.Context())
-
-		if err != nil {
-			http.Error(w, http.StatusText(401), 401)
-			return
-		}
-
-		if token == nil || !token.Valid {
-			http.Error(w, http.StatusText(401), 401)
-			return
-		}
-
-		// Token is authenticated, pass it through
-		next.ServeHTTP(w, r)
-	})
-}
-
-func FromContext(ctx context.Context) (*jwt.Token, Claims, error) {
-	token, _ := ctx.Value(TokenCtxKey).(*jwt.Token)
-
-	var claims Claims
-	if token != nil {
-		claims, _ = token.Claims.(Claims)
-	} else {
-		claims = Claims{}
-	}
-
-	err, _ := ctx.Value(ErrorCtxKey).(error)
-
-	return token, claims, err
-}
-
-func (ja *JwtAuth) SetContext(ctx context.Context, t *jwt.Token, err error) context.Context {
-	ctx = context.WithValue(ctx, TokenCtxKey, t)
-	ctx = context.WithValue(ctx, ErrorCtxKey, err)
-	return ctx
 }
 
 func (ja *JwtAuth) Encode(claims Claims) (t *jwt.Token, tokenString string, err error) {
@@ -223,7 +179,51 @@ func (ja *JwtAuth) keyFunc(t *jwt.Token) (interface{}, error) {
 	}
 }
 
-func (ja *JwtAuth) IsExpired(t *jwt.Token) bool {
+// Authenticator is a default authentication middleware to enforce access from the
+// Verifier middleware request context values. The Authenticator sends a 401 Unauthorized
+// response for any unverified tokens and passes the good ones through. It's just fine
+// until you decide to write something similar and customize your client response.
+func Authenticator(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		token, _, err := FromContext(r.Context())
+
+		if err != nil {
+			http.Error(w, http.StatusText(401), 401)
+			return
+		}
+
+		if token == nil || !token.Valid {
+			http.Error(w, http.StatusText(401), 401)
+			return
+		}
+
+		// Token is authenticated, pass it through
+		next.ServeHTTP(w, r)
+	})
+}
+
+func NewContext(ctx context.Context, t *jwt.Token, err error) context.Context {
+	ctx = context.WithValue(ctx, TokenCtxKey, t)
+	ctx = context.WithValue(ctx, ErrorCtxKey, err)
+	return ctx
+}
+
+func FromContext(ctx context.Context) (*jwt.Token, Claims, error) {
+	token, _ := ctx.Value(TokenCtxKey).(*jwt.Token)
+
+	var claims Claims
+	if token != nil {
+		claims, _ = token.Claims.(Claims)
+	} else {
+		claims = Claims{}
+	}
+
+	err, _ := ctx.Value(ErrorCtxKey).(error)
+
+	return token, claims, err
+}
+
+func IsExpired(t *jwt.Token) bool {
 	claims := t.Claims.(Claims)
 
 	if expv, ok := claims["exp"]; ok {
