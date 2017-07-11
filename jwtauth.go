@@ -165,11 +165,6 @@ func (ja *JwtAuth) Decode(tokenString string) (t *jwt.Token, err error) {
 	if err != nil {
 		return nil, err
 	}
-
-	// Wrap type to jwtauth.Claims
-	claims := Claims(t.Claims.(jwt.MapClaims))
-	t.Claims = claims
-
 	return
 }
 
@@ -215,7 +210,11 @@ func FromContext(ctx context.Context) (*jwt.Token, Claims, error) {
 
 	var claims Claims
 	if token != nil {
-		claims, _ = token.Claims.(Claims)
+		tokenClaims, ok := token.Claims.(jwt.MapClaims)
+		if !ok {
+			panic("jwtauth: expecting jwt.MapClaims")
+		}
+		claims = Claims(tokenClaims)
 	} else {
 		claims = Claims{}
 	}
@@ -226,7 +225,10 @@ func FromContext(ctx context.Context) (*jwt.Token, Claims, error) {
 }
 
 func IsExpired(t *jwt.Token) bool {
-	claims := t.Claims.(Claims)
+	claims, ok := t.Claims.(jwt.MapClaims)
+	if !ok {
+		panic("jwtauth: expecting jwt.MapClaims")
+	}
 
 	if expv, ok := claims["exp"]; ok {
 		var exp int64
