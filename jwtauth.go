@@ -72,80 +72,84 @@ func Verifier(ja *JwtAuth) func(http.Handler) http.Handler {
 	}
 }
 
-// TODO: explain
 func Verify(ja *JwtAuth, paramAliases ...string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		hfn := func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
-			var tokenStr string
-			var err error
-
-			// Get token from query params
-			tokenStr = r.URL.Query().Get("jwt")
-
-			// Get token from other param aliases
-			if tokenStr == "" && paramAliases != nil && len(paramAliases) > 0 {
-				for _, p := range paramAliases {
-					tokenStr = r.URL.Query().Get(p)
-					if tokenStr != "" {
-						break
-					}
-				}
-			}
-
-			// Get token from authorization header
-			if tokenStr == "" {
-				bearer := r.Header.Get("Authorization")
-				if len(bearer) > 7 && strings.ToUpper(bearer[0:6]) == "BEARER" {
-					tokenStr = bearer[7:]
-				}
-			}
-
-			// Get token from cookie
-			if tokenStr == "" {
-				// TODO: paramAliases should apply to cookies too..
-				cookie, err := r.Cookie("jwt")
-				if err == nil {
-					tokenStr = cookie.Value
-				}
-			}
-
-			// TODO: what other kinds of validations should we do / error messages?
-
-			// Verify the token
-			token, err := ja.Decode(tokenStr)
-			if err != nil {
-				switch err.Error() {
-				case "token is expired":
-					err = ErrExpired
-				}
-
-				ctx = NewContext(ctx, token, err)
-				next.ServeHTTP(w, r.WithContext(ctx))
-				return
-			}
-
-			if token == nil || !token.Valid || token.Method != ja.signer {
-				err = ErrUnauthorized
-				ctx = NewContext(ctx, token, err)
-				next.ServeHTTP(w, r.WithContext(ctx))
-				return
-			}
-
-			// Check expiry via "exp" claim
-			if IsExpired(token) {
-				err = ErrExpired
-				ctx = NewContext(ctx, token, err)
-				next.ServeHTTP(w, r.WithContext(ctx))
-				return
-			}
-
-			// Valid! pass it down the context to an authenticator middleware
+			token, err := VerifyRequest(ja, r, paramAliases...)
 			ctx = NewContext(ctx, token, err)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		}
 		return http.HandlerFunc(hfn)
 	}
+}
+
+func VerifyRequest(ja *JwtAuth, r *http.Request, paramAliases ...string) (*jwt.Token, error) {
+	var tokenStr string
+	var err error
+
+	// Get token from query params
+	tokenStr = r.URL.Query().Get("jwt")
+
+	// Get token from other param aliases
+	if tokenStr == "" && paramAliases != nil && len(paramAliases) > 0 {
+		for _, p := range paramAliases {
+			tokenStr = r.URL.Query().Get(p)
+			if tokenStr != "" {
+				break
+			}
+		}
+	}
+
+	// Get token from authorization header
+	if tokenStr == "" {
+		bearer := r.Header.Get("Authorization")
+		if len(bearer) > 7 && strings.ToUpper(bearer[0:6]) == "BEARER" {
+			tokenStr = bearer[7:]
+		}
+	}
+
+	// Get token from cookie
+	if tokenStr == "" {
+		// TODO: paramAliases should apply to cookies too..
+		cookie, err := r.Cookie("jwt")
+		if err == nil {
+			tokenStr = cookie.Value
+		}
+	}
+
+	// TODO: what other kinds of validations should we do / error messages?
+
+	// Verify the token
+	token, err := ja.Decode(tokenStr)
+	if err != nil {
+		switch err.Error() {
+		case "token is expired":
+			err = ErrExpired
+		}
+
+		// ctx = NewContext(ctx, token, err)
+		// next.ServeHTTP(w, r.WithContext(ctx))
+		return token, err
+	}
+
+	if token == nil || !token.Valid || token.Method != ja.signer {
+		err = ErrUnauthorized
+		// ctx = NewContext(ctx, token, err)
+		// next.ServeHTTP(w, r.WithContext(ctx))
+		return token, err
+	}
+
+	// Check expiry via "exp" claim
+	if IsExpired(token) {
+		err = ErrExpired
+		// ctx = NewContext(ctx, token, err)
+		// next.ServeHTTP(w, r.WithContext(ctx))
+		return token, err
+	}
+
+	// Valid!
+	return token, nil
 }
 
 func (ja *JwtAuth) Encode(claims Claims) (t *jwt.Token, tokenString string, err error) {
