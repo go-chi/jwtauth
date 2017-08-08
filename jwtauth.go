@@ -127,24 +127,17 @@ func VerifyRequest(ja *JwtAuth, r *http.Request, paramAliases ...string) (*jwt.T
 		case "token is expired":
 			err = ErrExpired
 		}
-
-		// ctx = NewContext(ctx, token, err)
-		// next.ServeHTTP(w, r.WithContext(ctx))
 		return token, err
 	}
 
 	if token == nil || !token.Valid || token.Method != ja.signer {
 		err = ErrUnauthorized
-		// ctx = NewContext(ctx, token, err)
-		// next.ServeHTTP(w, r.WithContext(ctx))
 		return token, err
 	}
 
 	// Check expiry via "exp" claim
 	if IsExpired(token) {
 		err = ErrExpired
-		// ctx = NewContext(ctx, token, err)
-		// next.ServeHTTP(w, r.WithContext(ctx))
 		return token, err
 	}
 
