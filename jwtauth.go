@@ -21,21 +21,19 @@ var (
 	ErrExpired      = errors.New("jwtauth: token is expired")
 )
 
-// An ExtractorFunc retreives the token string from the request.
-type ExtractorFunc func(r *http.Request) string
-
 var (
-	// ExtractCookie tries to retreive the token string from a cookie named "jwt".
-	ExtractCookie = func(r *http.Request) string {
+	// TokenFromCookie tries to retreive the token string from a cookie named
+	// "jwt".
+	TokenFromCookie = func(r *http.Request) string {
 		cookie, err := r.Cookie("jwt")
 		if err != nil {
 			return ""
 		}
 		return cookie.Value
 	}
-	// ExtractHeader tries to retreive the token string from the "Authorization"
-	// reqeust header: "Authorization: BEARER T".
-	ExtractHeader = func(r *http.Request) string {
+	// TokenFromHeader tries to retreive the token string from the
+	// "Authorization" reqeust header: "Authorization: BEARER T".
+	TokenFromHeader = func(r *http.Request) string {
 		// Get token from authorization header.
 		bearer := r.Header.Get("Authorization")
 		if len(bearer) > 7 && strings.ToUpper(bearer[0:6]) == "BEARER" {
@@ -43,9 +41,9 @@ var (
 		}
 		return ""
 	}
-	// ExtractQuery tries to retreive the token string from the" jwt" URI query
-	// parameter.
-	ExtractQuery = func(r *http.Request) string {
+	// TokenFromQuery tries to retreive the token string from the "jwt" URI
+	// query parameter.
+	TokenFromQuery = func(r *http.Request) string {
 		// Get token from query param named "jwt".
 		return r.URL.Query().Get("jwt")
 	}
@@ -98,15 +96,15 @@ func NewWithParser(alg string, parser *jwt.Parser, signKey []byte, verifyKey []b
 // http response.
 func Verifier(ja *JwtAuth) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
-		return Verify(ja, ExtractQuery, ExtractHeader, ExtractCookie)(next)
+		return Verify(ja, TokenFromCookie, TokenFromHeader, TokenFromQuery)(next)
 	}
 }
 
-func Verify(ja *JwtAuth, extractors ...ExtractorFunc) func(http.Handler) http.Handler {
+func Verify(ja *JwtAuth, findTokenFns ...func(r *http.Request) string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		hfn := func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
-			token, err := VerifyRequest(ja, r, extractors...)
+			token, err := VerifyRequest(ja, r, findTokenFns...)
 			ctx = NewContext(ctx, token, err)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		}
@@ -114,15 +112,15 @@ func Verify(ja *JwtAuth, extractors ...ExtractorFunc) func(http.Handler) http.Ha
 	}
 }
 
-func VerifyRequest(ja *JwtAuth, r *http.Request, extractors ...ExtractorFunc) (*jwt.Token, error) {
+func VerifyRequest(ja *JwtAuth, r *http.Request, findTokenFns ...func(r *http.Request) string) (*jwt.Token, error) {
 	var tokenStr string
 	var err error
 
-	// Extract token string from the request by calling extractors in the order
-	// they where provided. Further extraction stops if an extractor returns a
-	// non-empty string.
-	for _, extractor := range extractors {
-		tokenStr = extractor(r)
+	// Extract token string from the request by calling token find functions in
+	// the order they where provided. Further extraction stops if a function
+	// returns a non-empty string.
+	for _, fn := range findTokenFns {
+		tokenStr = fn(r)
 		if tokenStr != "" {
 			break
 		}
