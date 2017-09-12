@@ -21,6 +21,36 @@ var (
 	ErrExpired      = errors.New("jwtauth: token is expired")
 )
 
+// An ExtractorFunc retreives the token string from the request.
+type ExtractorFunc func(r *http.Request) string
+
+var (
+	// ExtractCookie tries to retreive the token string from a cookie named "jwt".
+	ExtractCookie = func(r *http.Request) string {
+		cookie, err := r.Cookie("jwt")
+		if err != nil {
+			return ""
+		}
+		return cookie.Value
+	}
+	// ExtractHeader tries to retreive the token string from the "Authorization"
+	// reqeust header: "Authorization: BEARER T".
+	ExtractHeader = func(r *http.Request) string {
+		// Get token from authorization header.
+		bearer := r.Header.Get("Authorization")
+		if len(bearer) > 7 && strings.ToUpper(bearer[0:6]) == "BEARER" {
+			return bearer[7:]
+		}
+		return ""
+	}
+	// ExtractQuery tries to retreive the token string from the" jwt" URI query
+	// parameter.
+	ExtractQuery = func(r *http.Request) string {
+		// Get token from query param named "jwt".
+		return r.URL.Query().Get("jwt")
+	}
+)
+
 type JwtAuth struct {
 	signKey   []byte
 	verifyKey []byte
@@ -68,15 +98,15 @@ func NewWithParser(alg string, parser *jwt.Parser, signKey []byte, verifyKey []b
 // http response.
 func Verifier(ja *JwtAuth) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
-		return Verify(ja, "")(next)
+		return Verify(ja, ExtractQuery, ExtractHeader, ExtractCookie)(next)
 	}
 }
 
-func Verify(ja *JwtAuth, paramAliases ...string) func(http.Handler) http.Handler {
+func Verify(ja *JwtAuth, extractors ...ExtractorFunc) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		hfn := func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
-			token, err := VerifyRequest(ja, r, paramAliases...)
+			token, err := VerifyRequest(ja, r, extractors...)
 			ctx = NewContext(ctx, token, err)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		}
@@ -84,37 +114,17 @@ func Verify(ja *JwtAuth, paramAliases ...string) func(http.Handler) http.Handler
 	}
 }
 
-func VerifyRequest(ja *JwtAuth, r *http.Request, paramAliases ...string) (*jwt.Token, error) {
+func VerifyRequest(ja *JwtAuth, r *http.Request, extractors ...ExtractorFunc) (*jwt.Token, error) {
 	var tokenStr string
 	var err error
 
-	// Get token from query params
-	tokenStr = r.URL.Query().Get("jwt")
-
-	// Get token from other param aliases
-	if tokenStr == "" && paramAliases != nil && len(paramAliases) > 0 {
-		for _, p := range paramAliases {
-			tokenStr = r.URL.Query().Get(p)
-			if tokenStr != "" {
-				break
-			}
-		}
-	}
-
-	// Get token from authorization header
-	if tokenStr == "" {
-		bearer := r.Header.Get("Authorization")
-		if len(bearer) > 7 && strings.ToUpper(bearer[0:6]) == "BEARER" {
-			tokenStr = bearer[7:]
-		}
-	}
-
-	// Get token from cookie
-	if tokenStr == "" {
-		// TODO: paramAliases should apply to cookies too..
-		cookie, err := r.Cookie("jwt")
-		if err == nil {
-			tokenStr = cookie.Value
+	// Extract token string from the request by calling extractors in the order
+	// they where provided. Further extraction stops if an extractor returns a
+	// non-empty string.
+	for _, extractor := range extractors {
+		tokenStr = extractor(r)
+		if tokenStr != "" {
+			break
 		}
 	}
 
