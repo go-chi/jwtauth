@@ -96,7 +96,7 @@ func NewWithParser(alg string, parser *jwt.Parser, signKey []byte, verifyKey []b
 // http response.
 func Verifier(ja *JwtAuth) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
-		return Verify(ja, TokenFromCookie, TokenFromHeader, TokenFromQuery)(next)
+		return Verify(ja, TokenFromQuery, TokenFromHeader, TokenFromCookie)(next)
 	}
 }
 
