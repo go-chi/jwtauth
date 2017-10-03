@@ -22,15 +22,15 @@ var (
 )
 
 type JwtAuth struct {
-	signKey   []byte
-	verifyKey []byte
+	signKey   interface{}
+	verifyKey interface{}
 	signer    jwt.SigningMethod
 	parser    *jwt.Parser
 }
 
 // New creates a JwtAuth authenticator instance that provides middleware handlers
 // and encoding/decoding functions for JWT signing.
-func New(alg string, signKey []byte, verifyKey []byte) *JwtAuth {
+func New(alg string, signKey interface{}, verifyKey interface{}) *JwtAuth {
 	return NewWithParser(alg, &jwt.Parser{}, signKey, verifyKey)
 }
 
@@ -40,7 +40,7 @@ func New(alg string, signKey []byte, verifyKey []byte) *JwtAuth {
 // We explicitly toggle `SkipClaimsValidation` in the `jwt-go` parser so that
 // we can control when the claims are validated - in our case, by the Verifier
 // http middleware handler.
-func NewWithParser(alg string, parser *jwt.Parser, signKey []byte, verifyKey []byte) *JwtAuth {
+func NewWithParser(alg string, parser *jwt.Parser, signKey interface{}, verifyKey interface{}) *JwtAuth {
 	parser.SkipClaimsValidation = true
 	return &JwtAuth{
 		signKey:   signKey,
@@ -166,7 +166,7 @@ func (ja *JwtAuth) Decode(tokenString string) (t *jwt.Token, err error) {
 }
 
 func (ja *JwtAuth) keyFunc(t *jwt.Token) (interface{}, error) {
-	if ja.verifyKey != nil && len(ja.verifyKey) > 0 {
+	if ja.verifyKey != nil {
 		return ja.verifyKey, nil
 	} else {
 		return ja.signKey, nil
