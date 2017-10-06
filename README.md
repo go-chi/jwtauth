@@ -1,5 +1,6 @@
 jwtauth - JWT authentication middleware for Go HTTP services
 ============================================================
+[![GoDoc Widget]][GoDoc]
 
 The `jwtauth` http middleware package provides a simple way to verify a JWT token
 from a http request and send the result down the request context (`context.Context`).
@@ -105,3 +106,6 @@ func router() http.Handler {
 # LICENSE
 
 [MIT](/LICENSE)
+
+[GoDoc]: https://godoc.org/github.com/go-chi/jwtauth
+[GoDoc Widget]: https://godoc.org/github.com/go-chi/jwtauth?status.svg
