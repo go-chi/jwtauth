@@ -19,10 +19,10 @@ import (
 )
 
 var (
-	TokenAuthHS256 *jwtauth.JwtAuth
+	TokenAuthHS256 *jwtauth.JWTAuth
 	TokenSecret    = []byte("secretpass")
 
-	TokenAuthRS256 *jwtauth.JwtAuth
+	TokenAuthRS256 *jwtauth.JWTAuth
 
 	PrivateKeyRS256String = `-----BEGIN RSA PRIVATE KEY-----
 MIIBOwIBAAJBALxo3PCjFw4QjgOX06QCJIJBnXXNiEYwDLxxa5/7QyH6y77nCRQy

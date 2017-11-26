@@ -49,16 +49,16 @@ var (
 	}
 )
 
-type JwtAuth struct {
+type JWTAuth struct {
 	signKey   interface{}
 	verifyKey interface{}
 	signer    jwt.SigningMethod
 	parser    *jwt.Parser
 }
 
-// New creates a JwtAuth authenticator instance that provides middleware handlers
+// New creates a JWTAuth authenticator instance that provides middleware handlers
 // and encoding/decoding functions for JWT signing.
-func New(alg string, signKey interface{}, verifyKey interface{}) *JwtAuth {
+func New(alg string, signKey interface{}, verifyKey interface{}) *JWTAuth {
 	return NewWithParser(alg, &jwt.Parser{}, signKey, verifyKey)
 }
 
@@ -68,9 +68,9 @@ func New(alg string, signKey interface{}, verifyKey interface{}) *JwtAuth {
 // We explicitly toggle `SkipClaimsValidation` in the `jwt-go` parser so that
 // we can control when the claims are validated - in our case, by the Verifier
 // http middleware handler.
-func NewWithParser(alg string, parser *jwt.Parser, signKey interface{}, verifyKey interface{}) *JwtAuth {
+func NewWithParser(alg string, parser *jwt.Parser, signKey interface{}, verifyKey interface{}) *JWTAuth {
 	parser.SkipClaimsValidation = true
-	return &JwtAuth{
+	return &JWTAuth{
 		signKey:   signKey,
 		verifyKey: verifyKey,
 		signer:    jwt.GetSigningMethod(alg),
@@ -94,13 +94,13 @@ func NewWithParser(alg string, parser *jwt.Parser, signKey interface{}, verifyKe
 // be the generic `jwtauth.Authenticator` middleware or your own custom handler
 // which checks the request context jwt token and error to prepare a custom
 // http response.
-func Verifier(ja *JwtAuth) func(http.Handler) http.Handler {
+func Verifier(ja *JWTAuth) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return Verify(ja, TokenFromQuery, TokenFromHeader, TokenFromCookie)(next)
 	}
 }
 
-func Verify(ja *JwtAuth, findTokenFns ...func(r *http.Request) string) func(http.Handler) http.Handler {
+func Verify(ja *JWTAuth, findTokenFns ...func(r *http.Request) string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		hfn := func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
@@ -112,7 +112,7 @@ func Verify(ja *JwtAuth, findTokenFns ...func(r *http.Request) string) func(http
 	}
 }
 
-func VerifyRequest(ja *JwtAuth, r *http.Request, findTokenFns ...func(r *http.Request) string) (*jwt.Token, error) {
+func VerifyRequest(ja *JWTAuth, r *http.Request, findTokenFns ...func(r *http.Request) string) (*jwt.Token, error) {
 	var tokenStr string
 	var err error
 
@@ -153,7 +153,7 @@ func VerifyRequest(ja *JwtAuth, r *http.Request, findTokenFns ...func(r *http.Re
 	return token, nil
 }
 
-func (ja *JwtAuth) Encode(claims Claims) (t *jwt.Token, tokenString string, err error) {
+func (ja *JWTAuth) Encode(claims Claims) (t *jwt.Token, tokenString string, err error) {
 	t = jwt.New(ja.signer)
 	t.Claims = claims
 	tokenString, err = t.SignedString(ja.signKey)
@@ -161,7 +161,7 @@ func (ja *JwtAuth) Encode(claims Claims) (t *jwt.Token, tokenString string, err 
 	return
 }
 
-func (ja *JwtAuth) Decode(tokenString string) (t *jwt.Token, err error) {
+func (ja *JWTAuth) Decode(tokenString string) (t *jwt.Token, err error) {
 	// Decode the tokenString, but avoid using custom Claims via jwt-go's
 	// ParseWithClaims as the jwt-go types will cause some glitches, so easier
 	// to decode as MapClaims then wrap the underlying map[string]interface{}
@@ -173,7 +173,7 @@ func (ja *JwtAuth) Decode(tokenString string) (t *jwt.Token, err error) {
 	return
 }
 
-func (ja *JwtAuth) keyFunc(t *jwt.Token) (interface{}, error) {
+func (ja *JWTAuth) keyFunc(t *jwt.Token) (interface{}, error) {
 	if ja.verifyKey != nil {
 		return ja.verifyKey, nil
 	} else {
