@@ -21,34 +21,6 @@ var (
 	ErrExpired      = errors.New("jwtauth: token is expired")
 )
 
-var (
-	// TokenFromCookie tries to retreive the token string from a cookie named
-	// "jwt".
-	TokenFromCookie = func(r *http.Request) string {
-		cookie, err := r.Cookie("jwt")
-		if err != nil {
-			return ""
-		}
-		return cookie.Value
-	}
-	// TokenFromHeader tries to retreive the token string from the
-	// "Authorization" reqeust header: "Authorization: BEARER T".
-	TokenFromHeader = func(r *http.Request) string {
-		// Get token from authorization header.
-		bearer := r.Header.Get("Authorization")
-		if len(bearer) > 7 && strings.ToUpper(bearer[0:6]) == "BEARER" {
-			return bearer[7:]
-		}
-		return ""
-	}
-	// TokenFromQuery tries to retreive the token string from the "jwt" URI
-	// query parameter.
-	TokenFromQuery = func(r *http.Request) string {
-		// Get token from query param named "jwt".
-		return r.URL.Query().Get("jwt")
-	}
-)
-
 type JWTAuth struct {
 	signKey   interface{}
 	verifyKey interface{}
@@ -308,6 +280,34 @@ func EpochNow() int64 {
 // Helper function to return calculated time in the future for "exp" claim.
 func ExpireIn(tm time.Duration) int64 {
 	return EpochNow() + int64(tm.Seconds())
+}
+
+// TokenFromCookie tries to retreive the token string from a cookie named
+// "jwt".
+func TokenFromCookie(r *http.Request) string {
+	cookie, err := r.Cookie("jwt")
+	if err != nil {
+		return ""
+	}
+	return cookie.Value
+}
+
+// TokenFromHeader tries to retreive the token string from the
+// "Authorization" reqeust header: "Authorization: BEARER T".
+func TokenFromHeader(r *http.Request) string {
+	// Get token from authorization header.
+	bearer := r.Header.Get("Authorization")
+	if len(bearer) > 7 && strings.ToUpper(bearer[0:6]) == "BEARER" {
+		return bearer[7:]
+	}
+	return ""
+}
+
+// TokenFromQuery tries to retreive the token string from the "jwt" URI
+// query parameter.
+func TokenFromQuery(r *http.Request) string {
+	// Get token from query param named "jwt".
+	return r.URL.Query().Get("jwt")
 }
 
 // contextKey is a value for use with context.WithValue. It's used as
