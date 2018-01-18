@@ -19,6 +19,7 @@ var (
 var (
 	ErrUnauthorized = errors.New("jwtauth: token is unauthorized")
 	ErrExpired      = errors.New("jwtauth: token is expired")
+	ErrNoTokenFound = errors.New("jwtauth: no token found")
 )
 
 type JWTAuth struct {
@@ -96,6 +97,9 @@ func VerifyRequest(ja *JWTAuth, r *http.Request, findTokenFns ...func(r *http.Re
 		if tokenStr != "" {
 			break
 		}
+	}
+	if tokenStr == "" {
+		return nil, ErrNoTokenFound
 	}
 
 	// TODO: what other kinds of validations should we do / error messages?
