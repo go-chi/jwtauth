@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -191,11 +192,14 @@ func FromContext(ctx context.Context) (*jwt.Token, Claims, error) {
 
 	var claims Claims
 	if token != nil {
-		tokenClaims, ok := token.Claims.(jwt.MapClaims)
-		if !ok {
-			panic("jwtauth: expecting jwt.MapClaims")
+		switch tokenClaims := token.Claims.(type) {
+		case Claims:
+			// Nop.
+		case jwt.MapClaims:
+			claims = Claims(tokenClaims)
+		default:
+			panic(fmt.Sprintf("jwtauth: unknown type of Claims: %T", token.Claims))
 		}
-		claims = Claims(tokenClaims)
 	} else {
 		claims = Claims{}
 	}
