@@ -194,7 +194,7 @@ func FromContext(ctx context.Context) (*jwt.Token, Claims, error) {
 	if token != nil {
 		switch tokenClaims := token.Claims.(type) {
 		case Claims:
-			// Nop.
+			claims = tokenClaims
 		case jwt.MapClaims:
 			claims = Claims(tokenClaims)
 		default:
