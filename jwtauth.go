@@ -19,7 +19,10 @@ var (
 var (
 	ErrUnauthorized = errors.New("jwtauth: token is unauthorized")
 	ErrExpired      = errors.New("jwtauth: token is expired")
+	ErrNBFInvalid   = errors.New("jwtauth: token nbf validation failed")
+	ErrIATInvalid   = errors.New("jwtauth: token iat validation failed")
 	ErrNoTokenFound = errors.New("jwtauth: no token found")
+	ErrAlgoInvalid  = errors.New("jwtauth: algorithm mismatch")
 )
 
 type JWTAuth struct {
@@ -100,23 +103,26 @@ func VerifyRequest(ja *JWTAuth, r *http.Request, findTokenFns ...func(r *http.Re
 	// Verify the token
 	token, err := ja.Decode(tokenStr)
 	if err != nil {
-		switch err.Error() {
-		case "token is expired":
-			err = ErrExpired
+		if verr, ok := err.(*jwt.ValidationError); ok {
+			if verr.Errors&jwt.ValidationErrorExpired > 0 {
+				return token, ErrExpired
+			} else if verr.Errors&jwt.ValidationErrorIssuedAt > 0 {
+				return token, ErrIATInvalid
+			} else if verr.Errors&jwt.ValidationErrorIssuedAt > 0 {
+				return token, ErrNBFInvalid
+			}
 		}
 		return token, err
 	}
 
-	if token == nil || !token.Valid || token.Method != ja.signer {
+	if token.Method != ja.signer {
+		return token, ErrAlgoInvalid
+	}
+
+	if token == nil || !token.Valid {
 		err = ErrUnauthorized
 		return token, err
 	}
-
-	// Check expiry via "exp" claim
-	// if IsExpired(token) {
-	// 	err = ErrExpired
-	// 	return token, err
-	// }
 
 	// Valid!
 	return token, nil
@@ -134,11 +140,6 @@ func (ja *JWTAuth) Decode(tokenString string) (t *jwt.Token, err error) {
 	t, err = ja.parser.Parse(tokenString, ja.keyFunc)
 	if err != nil {
 		return nil, err
-	}
-
-	// Don't forget to validate the alg is what you expect.
-	if t.Method.Alg() != ja.signer.Alg() {
-		return nil, fmt.Errorf("Unexpected signing method: %v", t.Method.Alg())
 	}
 	return
 }
@@ -198,77 +199,6 @@ func FromContext(ctx context.Context) (*jwt.Token, jwt.MapClaims, error) {
 
 	return token, claims, err
 }
-
-// func IsExpired(t *jwt.Token) bool {
-// 	claims, ok := t.Claims.(jwt.MapClaims)
-// 	if !ok {
-// 		panic("jwtauth: expecting jwt.MapClaims")
-// 	}
-
-// 	if expv, ok := claims["exp"]; ok {
-// 		var exp int64
-// 		switch v := expv.(type) {
-// 		case float64:
-// 			exp = int64(v)
-// 		case int64:
-// 			exp = v
-// 		case json.Number:
-// 			exp, _ = v.Int64()
-// 		default:
-// 		}
-
-// 		if exp < EpochNow() {
-// 			return true
-// 		}
-// 	}
-
-// 	return false
-// }
-
-// // Claims is a convenience type to manage a JWT claims hash.
-// type Claims map[string]interface{}
-
-// NOTE: as of v3.0 of jwt-go, Valid() interface method is called to verify
-// the claims. However, the current design we test these claims in the
-// Verifier middleware, so we skip this step.
-// func (c Claims) Valid() error {
-// 	return nil
-// }
-
-// func (c Claims) Set(k string, v interface{}) Claims {
-// 	c[k] = v
-// 	return c
-// }
-
-// func (c Claims) Get(k string) (interface{}, bool) {
-// 	v, ok := c[k]
-// 	return v, ok
-// }
-
-// // Set issued at ("iat") to specified time in the claims
-// func (c Claims) SetIssuedAt(tm time.Time) Claims {
-// 	c["iat"] = tm.UTC().Unix()
-// 	return c
-// }
-
-// // Set issued at ("iat") to present time in the claims
-// func (c Claims) SetIssuedNow() Claims {
-// 	c["iat"] = EpochNow()
-// 	return c
-// }
-
-// // Set expiry ("exp") in the claims and return itself so it can be chained
-// func (c Claims) SetExpiry(tm time.Time) Claims {
-// 	c["exp"] = tm.UTC().Unix()
-// 	return c
-// }
-
-// // Set expiry ("exp") in the claims to some duration from the present time
-// // and return itself so it can be chained
-// func (c Claims) SetExpiryIn(tm time.Duration) Claims {
-// 	c["exp"] = ExpireIn(tm)
-// 	return c
-// }
 
 func UnixTime(tm time.Time) int64 {
 	return tm.UTC().Unix()
