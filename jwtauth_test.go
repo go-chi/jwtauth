@@ -13,9 +13,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/beliantech/jwtauth"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/go-chi/chi"
-	"github.com/go-chi/jwtauth"
 )
 
 var (
@@ -69,7 +69,7 @@ func TestSimpleRSA(t *testing.T) {
 
 	TokenAuthRS256 = jwtauth.New("RS256", privateKey, publicKey)
 
-	claims := jwtauth.Claims{
+	claims := jwt.MapClaims{
 		"key":  "val",
 		"key2": "val2",
 		"key3": "val3",
@@ -87,7 +87,7 @@ func TestSimpleRSA(t *testing.T) {
 		t.Fatalf("Failed to decode token string %s\n", err.Error())
 	}
 
-	if !reflect.DeepEqual(claims, jwtauth.Claims(token.Claims.(jwt.MapClaims))) {
+	if !reflect.DeepEqual(claims, jwt.MapClaims(token.Claims.(jwt.MapClaims))) {
 		t.Fatalf("The decoded claims don't match the original ones\n")
 	}
 }
@@ -220,7 +220,7 @@ func TestMore(t *testing.T) {
 		t.Fatalf(resp)
 	}
 
-	h = newAuthHeader((jwtauth.Claims{}).Set("exp", jwtauth.EpochNow()-1000))
+	h = newAuthHeader(jwt.MapClaims{"exp": jwtauth.EpochNow() - 1000})
 	if status, resp := testRequest(t, ts, "GET", "/admin", h, nil); status != 401 || resp != "expired\n" {
 		t.Fatalf(resp)
 	}
@@ -230,7 +230,7 @@ func TestMore(t *testing.T) {
 		t.Fatalf(resp)
 	}
 
-	h = newAuthHeader((jwtauth.Claims{"user_id": 31337}).SetExpiryIn(5 * time.Minute))
+	h = newAuthHeader((jwt.MapClaims{"user_id": 31337, "exp": jwtauth.ExpireIn(5 * time.Minute)}))
 	if status, resp := testRequest(t, ts, "GET", "/admin", h, nil); status != 200 || resp != "protected, user:31337" {
 		t.Fatalf(resp)
 	}
@@ -269,7 +269,7 @@ func testRequest(t *testing.T, ts *httptest.Server, method, path string, header 
 	return resp.StatusCode, string(respBody)
 }
 
-func newJwtToken(secret []byte, claims ...jwtauth.Claims) string {
+func newJwtToken(secret []byte, claims ...jwt.MapClaims) string {
 	token := jwt.New(jwt.GetSigningMethod("HS256"))
 	if len(claims) > 0 {
 		token.Claims = claims[0]
@@ -281,7 +281,7 @@ func newJwtToken(secret []byte, claims ...jwtauth.Claims) string {
 	return tokenStr
 }
 
-func newJwt512Token(secret []byte, claims ...jwtauth.Claims) string {
+func newJwt512Token(secret []byte, claims ...jwt.MapClaims) string {
 	// use-case: when token is signed with a different alg than expected
 	token := jwt.New(jwt.GetSigningMethod("HS512"))
 	if len(claims) > 0 {
@@ -294,7 +294,7 @@ func newJwt512Token(secret []byte, claims ...jwtauth.Claims) string {
 	return tokenStr
 }
 
-func newAuthHeader(claims ...jwtauth.Claims) http.Header {
+func newAuthHeader(claims ...jwt.MapClaims) http.Header {
 	h := http.Header{}
 	h.Set("Authorization", "BEARER "+newJwtToken(TokenSecret, claims...))
 	return h

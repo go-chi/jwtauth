@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/dgrijalva/jwt-go"
 )
@@ -112,10 +113,10 @@ func VerifyRequest(ja *JWTAuth, r *http.Request, findTokenFns ...func(r *http.Re
 	}
 
 	// Check expiry via "exp" claim
-	if IsExpired(token) {
-		err = ErrExpired
-		return token, err
-	}
+	// if IsExpired(token) {
+	// 	err = ErrExpired
+	// 	return token, err
+	// }
 
 	// Valid!
 	return token, nil
@@ -136,7 +137,7 @@ func (ja *JWTAuth) Decode(tokenString string) (t *jwt.Token, err error) {
 	}
 
 	// Don't forget to validate the alg is what you expect.
-	if t.Method.Alg() == ja.signer.Alg() {
+	if t.Method.Alg() != ja.signer.Alg() {
 		return nil, fmt.Errorf("Unexpected signing method: %v", t.Method.Alg())
 	}
 	return
@@ -184,16 +185,13 @@ func FromContext(ctx context.Context) (*jwt.Token, jwt.MapClaims, error) {
 
 	var claims jwt.MapClaims
 	if token != nil {
-		switch tokenClaims := token.Claims.(type) {
-		case Claims:
+		if tokenClaims, ok := token.Claims.(jwt.MapClaims); ok {
 			claims = tokenClaims
-		case jwt.MapClaims:
-			claims = Claims(tokenClaims)
-		default:
+		} else {
 			panic(fmt.Sprintf("jwtauth: unknown type of Claims: %T", token.Claims))
 		}
 	} else {
-		claims = Claims{}
+		claims = jwt.MapClaims{}
 	}
 
 	err, _ := ctx.Value(ErrorCtxKey).(error)
@@ -272,15 +270,19 @@ func FromContext(ctx context.Context) (*jwt.Token, jwt.MapClaims, error) {
 // 	return c
 // }
 
+func UnixTime(tm time.Time) int64 {
+	return tm.UTC().Unix()
+}
+
 // // Helper function that returns the NumericDate time value used by the spec
-// func EpochNow() int64 {
-// 	return time.Now().UTC().Unix()
-// }
+func EpochNow() int64 {
+	return time.Now().UTC().Unix()
+}
 
 // // Helper function to return calculated time in the future for "exp" claim.
-// func ExpireIn(tm time.Duration) int64 {
-// 	return EpochNow() + int64(tm.Seconds())
-// }
+func ExpireIn(tm time.Duration) int64 {
+	return EpochNow() + int64(tm.Seconds())
+}
 
 // TokenFromCookie tries to retreive the token string from a cookie named
 // "jwt".

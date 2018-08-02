@@ -62,9 +62,9 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/beliantech/jwtauth"
 	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/go-chi/chi"
-	"github.com/go-chi/jwtauth"
 )
 
 var tokenAuth *jwtauth.JWTAuth
