@@ -11,11 +11,13 @@ import (
 	"github.com/dgrijalva/jwt-go"
 )
 
+// Context keys
 var (
 	TokenCtxKey = &contextKey{"Token"}
 	ErrorCtxKey = &contextKey{"Error"}
 )
 
+// Library errors
 var (
 	ErrUnauthorized = errors.New("jwtauth: token is unauthorized")
 	ErrExpired      = errors.New("jwtauth: token is expired")
@@ -200,16 +202,17 @@ func FromContext(ctx context.Context) (*jwt.Token, jwt.MapClaims, error) {
 	return token, claims, err
 }
 
+// UnixTime returns the given time in UTC milliseconds
 func UnixTime(tm time.Time) int64 {
 	return tm.UTC().Unix()
 }
 
-// // Helper function that returns the NumericDate time value used by the spec
+// EpochNow is a helper function that returns the NumericDate time value used by the spec
 func EpochNow() int64 {
 	return time.Now().UTC().Unix()
 }
 
-// // Helper function to return calculated time in the future for "exp" claim.
+// ExpireIn is a helper function to return calculated time in the future for "exp" claim
 func ExpireIn(tm time.Duration) int64 {
 	return EpochNow() + int64(tm.Seconds())
 }
