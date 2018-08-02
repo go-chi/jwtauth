@@ -117,13 +117,14 @@ func VerifyRequest(ja *JWTAuth, r *http.Request, findTokenFns ...func(r *http.Re
 		return token, err
 	}
 
-	if token.Method != ja.signer {
-		return token, ErrAlgoInvalid
-	}
-
 	if token == nil || !token.Valid {
 		err = ErrUnauthorized
 		return token, err
+	}
+
+	// Verify signing algorithm
+	if token.Method != ja.signer {
+		return token, ErrAlgoInvalid
 	}
 
 	// Valid!
