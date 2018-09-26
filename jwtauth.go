@@ -131,7 +131,7 @@ func VerifyRequest(ja *JWTAuth, r *http.Request, findTokenFns ...func(r *http.Re
 	return token, nil
 }
 
-func (ja *JWTAuth) Encode(claims jwt.MapClaims) (t *jwt.Token, tokenString string, err error) {
+func (ja *JWTAuth) Encode(claims jwt.Claims) (t *jwt.Token, tokenString string, err error) {
 	t = jwt.New(ja.signer)
 	t.Claims = claims
 	tokenString, err = t.SignedString(ja.signKey)
@@ -216,6 +216,26 @@ func EpochNow() int64 {
 // ExpireIn is a helper function to return calculated time in the future for "exp" claim
 func ExpireIn(tm time.Duration) int64 {
 	return EpochNow() + int64(tm.Seconds())
+}
+
+// Set issued at ("iat") to specified time in the claims
+func SetIssuedAt(claims jwt.MapClaims, tm time.Time) {
+	claims["iat"] = tm.UTC().Unix()
+}
+
+// Set issued at ("iat") to present time in the claims
+func SetIssuedNow(claims jwt.MapClaims) {
+	claims["iat"] = EpochNow()
+}
+
+// Set expiry ("exp") in the claims
+func SetExpiry(claims jwt.MapClaims, tm time.Time) {
+	claims["exp"] = tm.UTC().Unix()
+}
+
+// Set expiry ("exp") in the claims to some duration from the present time
+func SetExpiryIn(claims jwt.MapClaims, tm time.Duration) {
+	claims["exp"] = ExpireIn(tm)
 }
 
 // TokenFromCookie tries to retreive the token string from a cookie named
