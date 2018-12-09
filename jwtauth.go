@@ -28,10 +28,11 @@ var (
 )
 
 type JWTAuth struct {
-	signKey   interface{}
-	verifyKey interface{}
-	signer    jwt.SigningMethod
-	parser    *jwt.Parser
+	signKey       interface{}
+	verifyKey     interface{}
+	customKeyFunc jwt.Keyfunc
+	signer        jwt.SigningMethod
+	parser        *jwt.Parser
 }
 
 // New creates a JWTAuth authenticator instance that provides middleware handlers
@@ -49,6 +50,22 @@ func NewWithParser(alg string, parser *jwt.Parser, signKey interface{}, verifyKe
 		signer:    jwt.GetSigningMethod(alg),
 		parser:    parser,
 	}
+}
+
+// NewWithOptions is the same as New & NewWithParser but with dynamic options list
+// and suitable for future enchansment without break interface or produce a custom
+// `New` functions
+func NewWithOptions(alg string, options ...Option) *JWTAuth {
+	ja := &JWTAuth{
+		signer: jwt.GetSigningMethod(alg),
+	}
+	for _, opt := range options {
+		opt(ja)
+	}
+	if ja.parser == nil {
+		ja.parser = &jwt.Parser{}
+	}
+	return ja
 }
 
 // Verifier http middleware handler will verify a JWT string from a http request.
@@ -148,6 +165,10 @@ func (ja *JWTAuth) Decode(tokenString string) (t *jwt.Token, err error) {
 }
 
 func (ja *JWTAuth) keyFunc(t *jwt.Token) (interface{}, error) {
+	if ja.customKeyFunc != nil {
+		return ja.customKeyFunc(t)
+	}
+
 	if ja.verifyKey != nil {
 		return ja.verifyKey, nil
 	} else {
