@@ -1,7 +1,7 @@
 package jwtauth
 
 import (
-	"github.com/dgrijalva/jwt-go"
+	jwt "github.com/dgrijalva/jwt-go"
 )
 
 type Option func(ja *JWTAuth)

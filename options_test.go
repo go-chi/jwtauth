@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/dgrijalva/jwt-go"
+	jwt "github.com/dgrijalva/jwt-go"
 )
 
 func TestNewWithOptions(t *testing.T) {
