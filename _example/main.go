@@ -63,7 +63,7 @@ import (
 	"net/http"
 
 	jwt "github.com/dgrijalva/jwt-go"
-	"github.com/go-chi/chi/v4"
+	"github.com/go-chi/chi"
 	"github.com/go-chi/jwtauth"
 )
 
