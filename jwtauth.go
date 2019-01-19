@@ -87,7 +87,6 @@ func Verify(ja *JWTAuth, findTokenFns ...func(r *http.Request) string) func(http
 
 func VerifyRequest(ja *JWTAuth, r *http.Request, findTokenFns ...func(r *http.Request) string) (*jwt.Token, error) {
 	var tokenStr string
-	var err error
 
 	// Extract token string from the request by calling token find functions in
 	// the order they where provided. Further extraction stops if a function
@@ -98,37 +97,8 @@ func VerifyRequest(ja *JWTAuth, r *http.Request, findTokenFns ...func(r *http.Re
 			break
 		}
 	}
-	if tokenStr == "" {
-		return nil, ErrNoTokenFound
-	}
 
-	// Verify the token
-	token, err := ja.Decode(tokenStr)
-	if err != nil {
-		if verr, ok := err.(*jwt.ValidationError); ok {
-			if verr.Errors&jwt.ValidationErrorExpired > 0 {
-				return token, ErrExpired
-			} else if verr.Errors&jwt.ValidationErrorIssuedAt > 0 {
-				return token, ErrIATInvalid
-			} else if verr.Errors&jwt.ValidationErrorIssuedAt > 0 {
-				return token, ErrNBFInvalid
-			}
-		}
-		return token, err
-	}
-
-	if token == nil || !token.Valid {
-		err = ErrUnauthorized
-		return token, err
-	}
-
-	// Verify signing algorithm
-	if token.Method != ja.signer {
-		return token, ErrAlgoInvalid
-	}
-
-	// Valid!
-	return token, nil
+	return VerifyToken(ja, tokenStr)
 }
 
 func (ja *JWTAuth) Encode(claims jwt.Claims) (t *jwt.Token, tokenString string, err error) {
@@ -275,4 +245,42 @@ type contextKey struct {
 
 func (k *contextKey) String() string {
 	return "jwtauth context value " + k.name
+}
+
+// VerifyToken tries to verify the token string from the
+// "Authorization" struct. It's useful for testing and separate
+// concepts
+func VerifyToken(ja *JWTAuth, tokenStr string) (*jwt.Token, error) {
+
+	if tokenStr == "" {
+		return nil, ErrNoTokenFound
+	}
+
+	// Verify the token
+	token, err := ja.Decode(tokenStr)
+	if err != nil {
+		if verr, ok := err.(*jwt.ValidationError); ok {
+			if verr.Errors&jwt.ValidationErrorExpired > 0 {
+				return token, ErrExpired
+			} else if verr.Errors&jwt.ValidationErrorIssuedAt > 0 {
+				return token, ErrIATInvalid
+			} else if verr.Errors&jwt.ValidationErrorIssuedAt > 0 {
+				return token, ErrNBFInvalid
+			}
+		}
+		return token, err
+	}
+
+	if token == nil || !token.Valid {
+		err = ErrUnauthorized
+		return token, err
+	}
+
+	// Verify signing algorithm
+	if token.Method != ja.signer {
+		return token, ErrAlgoInvalid
+	}
+
+	// Valid!
+	return token, nil
 }
