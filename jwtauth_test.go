@@ -174,7 +174,8 @@ func TestMore(t *testing.T) {
 		r.Use(authenticator)
 
 		r.Get("/admin", func(w http.ResponseWriter, r *http.Request) {
-			_, claims, err := jwtauth.FromContext(r.Context())
+			_, c, err := jwtauth.FromContext(r.Context())
+			claims := c.(jwt.MapClaims)
 
 			if err != nil {
 				w.Write([]byte(fmt.Sprintf("error! %v", err)))
