@@ -31,7 +31,11 @@ type JWTAuth struct {
 	signKey   interface{}
 	verifyKey interface{}
 	signer    jwt.SigningMethod
-	parser    *jwt.Parser
+	parser    Parser
+}
+
+type Parser interface {
+	Parse(string, jwt.Keyfunc) (*jwt.Token, error)
 }
 
 // New creates a JWTAuth authenticator instance that provides middleware handlers
@@ -42,7 +46,7 @@ func New(alg string, signKey interface{}, verifyKey interface{}) *JWTAuth {
 
 // NewWithParser is the same as New, except it supports custom parser settings
 // introduced in jwt-go/v2.4.0.
-func NewWithParser(alg string, parser *jwt.Parser, signKey interface{}, verifyKey interface{}) *JWTAuth {
+func NewWithParser(alg string, parser Parser, signKey interface{}, verifyKey interface{}) *JWTAuth {
 	return &JWTAuth{
 		signKey:   signKey,
 		verifyKey: verifyKey,
@@ -184,12 +188,12 @@ func NewContext(ctx context.Context, t *jwt.Token, err error) context.Context {
 	return ctx
 }
 
-func FromContext(ctx context.Context) (*jwt.Token, jwt.MapClaims, error) {
+func FromContext(ctx context.Context) (*jwt.Token, jwt.Claims, error) {
 	token, _ := ctx.Value(TokenCtxKey).(*jwt.Token)
 
-	var claims jwt.MapClaims
+	var claims jwt.Claims
 	if token != nil {
-		if tokenClaims, ok := token.Claims.(jwt.MapClaims); ok {
+		if tokenClaims, ok := token.Claims.(jwt.Claims); ok {
 			claims = tokenClaims
 		} else {
 			panic(fmt.Sprintf("jwtauth: unknown type of Claims: %T", token.Claims))
