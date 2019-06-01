@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"reflect"
 	"strings"
 	"time"
 
@@ -147,11 +148,22 @@ func (ja *JWTAuth) Decode(tokenString string) (t *jwt.Token, err error) {
 	return
 }
 
+// if the interface is itself a function call that function with the token
+// and return its results. this allows for use cases like jwks without
+// changing the api
+func keyFuncOrValue(i interface{}, t *jwt.Token) (interface{}, error) {
+	if reflect.TypeOf(i).Kind() == reflect.Func {
+		fn := i.(func(t *jwt.Token) (interface{}, error))
+		return fn(t)
+	}
+	return i, nil
+}
+
 func (ja *JWTAuth) keyFunc(t *jwt.Token) (interface{}, error) {
 	if ja.verifyKey != nil {
-		return ja.verifyKey, nil
+		return keyFuncOrValue(ja.verifyKey, t)
 	} else {
-		return ja.signKey, nil
+		return keyFuncOrValue(ja.signKey, t)
 	}
 }
 
