@@ -27,11 +27,14 @@ var (
 	ErrAlgoInvalid  = errors.New("jwtauth: algorithm mismatch")
 )
 
+type DecodeTokenFunc func(string) (*jwt.Token, error)
+
 type JWTAuth struct {
-	signKey   interface{}
-	verifyKey interface{}
-	signer    jwt.SigningMethod
-	parser    *jwt.Parser
+	signKey    interface{}
+	verifyKey  interface{}
+	signer     jwt.SigningMethod
+	parser     *jwt.Parser
+	DecodeFunc DecodeTokenFunc
 }
 
 // New creates a JWTAuth authenticator instance that provides middleware handlers
@@ -140,6 +143,9 @@ func (ja *JWTAuth) Encode(claims jwt.Claims) (t *jwt.Token, tokenString string, 
 }
 
 func (ja *JWTAuth) Decode(tokenString string) (t *jwt.Token, err error) {
+	if ja.DecodeFunc != nil {
+		return ja.DecodeFunc(tokenString)
+	}
 	t, err = ja.parser.Parse(tokenString, ja.keyFunc)
 	if err != nil {
 		return nil, err
