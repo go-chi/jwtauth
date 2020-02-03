@@ -110,7 +110,7 @@ func VerifyRequest(ja *JWTAuth, r *http.Request, findTokenFns ...func(r *http.Re
 				return token, ErrExpired
 			} else if verr.Errors&jwt.ValidationErrorIssuedAt > 0 {
 				return token, ErrIATInvalid
-			} else if verr.Errors&jwt.ValidationErrorIssuedAt > 0 {
+			} else if verr.Errors&jwt.ValidationErrorNotValidYet > 0 {
 				return token, ErrNBFInvalid
 			}
 		}
