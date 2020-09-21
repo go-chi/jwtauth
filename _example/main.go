@@ -62,7 +62,7 @@ import (
 	"fmt"
 	"net/http"
 
-	jwt "github.com/dgrijalva/jwt-go"
+	jwt "github.com/form3tech-oss/jwt-go"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/jwtauth"
 )

@@ -7,7 +7,7 @@ from a http request and send the result down the request context (`context.Conte
 
 Please note, `jwtauth` works with any Go http router, but resides under the go-chi group
 for maintenance and organization - its only 3rd party dependency is the underlying jwt library
-"github.com/dgrijalva/jwt-go".
+"github.com/form3tech-oss/jwt-go".
 
 This package uses the new `context` package in Go 1.7 stdlib and [net/http#Request.Context](https://golang.org/pkg/net/http/#Request.Context) to pass values between handler chains.
 
