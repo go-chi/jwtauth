@@ -82,24 +82,27 @@ func Verify(ja *JWTAuth, findTokenFns ...func(r *http.Request) string) func(http
 }
 
 func VerifyRequest(ja *JWTAuth, r *http.Request, findTokenFns ...func(r *http.Request) string) (jwt.Token, error) {
-	var tokenStr string
-	var err error
+	var tokenString string
 
 	// Extract token string from the request by calling token find functions in
 	// the order they where provided. Further extraction stops if a function
 	// returns a non-empty string.
 	for _, fn := range findTokenFns {
-		tokenStr = fn(r)
-		if tokenStr != "" {
+		tokenString = fn(r)
+		if tokenString != "" {
 			break
 		}
 	}
-	if tokenStr == "" {
+	if tokenString == "" {
 		return nil, ErrNoTokenFound
 	}
 
+	return VerifyToken(ja, tokenString)
+}
+
+func VerifyToken(ja *JWTAuth, tokenString string) (jwt.Token, error) {
 	// Decode & verify the token
-	token, err := ja.Decode(tokenStr)
+	token, err := ja.Decode(tokenString)
 	if err != nil {
 		return token, ErrorReason(err)
 	}
