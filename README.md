@@ -7,9 +7,7 @@ from a http request and send the result down the request context (`context.Conte
 
 Please note, `jwtauth` works with any Go http router, but resides under the go-chi group
 for maintenance and organization - its only 3rd party dependency is the underlying jwt library
-"github.com/dgrijalva/jwt-go".
-
-This package uses the new `context` package in Go 1.7 stdlib and [net/http#Request.Context](https://golang.org/pkg/net/http/#Request.Context) to pass values between handler chains.
+"github.com/lestrrat-go/jwx".
 
 In a complete JWT-authentication flow, you'll first capture the token from a http
 request, decode it, verify it and then validate that its correctly signed and hasn't
@@ -65,7 +63,7 @@ func init() {
 
 	// For debugging/example purposes, we generate and print
 	// a sample jwt token with claims `user_id:123` here:
-	_, tokenString, _ := tokenAuth.Encode(jwt.MapClaims{"user_id": 123})
+	_, tokenString, _ := tokenAuth.Encode(map[string]interface{}{"user_id": 123})
 	fmt.Printf("DEBUG: a sample jwt is %s\n\n", tokenString)
 }
 
