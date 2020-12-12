@@ -12,13 +12,18 @@ import (
 	"github.com/lestrrat-go/jwx/jwt"
 )
 
-// Context keys
+type JWTAuth struct {
+	alg       jwa.SignatureAlgorithm
+	signKey   interface{} // private-key
+	verifyKey interface{} // public-key, only used by RSA and ECDSA algorithms
+	verifier  jwt.ParseOption
+}
+
 var (
 	TokenCtxKey = &contextKey{"Token"}
 	ErrorCtxKey = &contextKey{"Error"}
 )
 
-// Library errors
 var (
 	ErrUnauthorized = errors.New("token is unauthorized")
 	ErrExpired      = errors.New("token is expired")
@@ -27,13 +32,6 @@ var (
 	ErrNoTokenFound = errors.New("no token found")
 	ErrAlgoInvalid  = errors.New("algorithm mismatch")
 )
-
-type JWTAuth struct {
-	alg       jwa.SignatureAlgorithm
-	signKey   interface{} // private-key
-	verifyKey interface{} // public-key, only used by RSA and ECDSA algorithms
-	verifier  jwt.ParseOption
-}
 
 func New(alg string, signKey interface{}, verifyKey interface{}) *JWTAuth {
 	ja := &JWTAuth{alg: jwa.SignatureAlgorithm(alg), signKey: signKey, verifyKey: verifyKey}
@@ -65,7 +63,7 @@ func New(alg string, signKey interface{}, verifyKey interface{}) *JWTAuth {
 // http response.
 func Verifier(ja *JWTAuth) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
-		return Verify(ja, TokenFromQuery, TokenFromHeader, TokenFromCookie)(next)
+		return Verify(ja, TokenFromHeader, TokenFromCookie)(next)
 	}
 }
 
@@ -266,6 +264,14 @@ func TokenFromHeader(r *http.Request) string {
 
 // TokenFromQuery tries to retreive the token string from the "jwt" URI
 // query parameter.
+//
+// To use it, build our own middleware handler, such as:
+//
+// func Verifier(ja *JWTAuth) func(http.Handler) http.Handler {
+// 	return func(next http.Handler) http.Handler {
+// 		return Verify(ja, TokenFromQuery, TokenFromHeader, TokenFromCookie)(next)
+// 	}
+// }
 func TokenFromQuery(r *http.Request) string {
 	// Get token from query param named "jwt".
 	return r.URL.Query().Get("jwt")
