@@ -241,6 +241,23 @@ func SetExpiryIn(claims map[string]interface{}, tm time.Duration) {
 	claims["exp"] = ExpireIn(tm)
 }
 
+var tokenRetreivers = []func(r *http.Request) string{
+	TokenFromHeader,
+	TokenFromQuery,
+}
+
+// TokenFromRequest tries to retreive the token string from all supported methods:
+// TokenFromHeader and TokenFromQuery in same order
+func TokenFromRequest(r *http.Request) string {
+	for i := range tokenRetreivers {
+		if token := tokenRetreivers[i](r); token != "" {
+			return token
+		}
+	}
+
+	return ""
+}
+
 // TokenFromCookie tries to retreive the token string from a cookie named
 // "jwt".
 func TokenFromCookie(r *http.Request) string {

@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"reflect"
 	"testing"
 	"time"
@@ -228,6 +229,46 @@ func TestMore(t *testing.T) {
 	h = newAuthHeader((map[string]interface{}{"user_id": 31337, "exp": jwtauth.ExpireIn(5 * time.Minute)}))
 	if status, resp := testRequest(t, ts, "GET", "/admin", h, nil); status != 200 || resp != "protected, user:31337" {
 		t.Fatalf(resp)
+	}
+}
+
+func TestTokenFromRequest(t *testing.T) {
+	tests := []struct {
+		desc  string
+		r     *http.Request
+		token string
+	}{
+		{
+			desc: "request does not have any token",
+			r:    &http.Request{URL: &url.URL{}},
+		},
+		{
+			desc: "request has token in header",
+			r: &http.Request{
+				Header: http.Header{
+					"Authorization": []string{"Bearer testtoken"},
+				},
+				URL: &url.URL{},
+			},
+			token: "testtoken",
+		},
+		{
+			desc: "request has token in query",
+			r: &http.Request{
+				URL: &url.URL{
+					RawQuery: "jwt=testtoken",
+				},
+			},
+			token: "testtoken",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Logf("running case: %q", tt.desc)
+		token := jwtauth.TokenFromRequest(tt.r)
+		if tt.token != token {
+			t.Fatalf("expected token: %q, got: %q", tt.token, token)
+		}
 	}
 }
 
