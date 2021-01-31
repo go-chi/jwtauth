@@ -1,7 +1,6 @@
 package jwtauth
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"net/http"
@@ -139,7 +138,7 @@ func (ja *JWTAuth) sign(token jwt.Token) ([]byte, error) {
 }
 
 func (ja *JWTAuth) parse(payload []byte) (jwt.Token, error) {
-	return jwt.Parse(bytes.NewReader(payload), ja.verifier)
+	return jwt.Parse(payload, ja.verifier)
 }
 
 // ErrorReason will normalize the error message from the underlining

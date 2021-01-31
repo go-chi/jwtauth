@@ -4,5 +4,6 @@ go 1.15
 
 require (
 	github.com/go-chi/chi v1.5.1
-	github.com/lestrrat-go/jwx v1.0.6-0.20201127121120-26218808f029
+	github.com/lestrrat-go/jwx v1.1.0
+	golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad // indirect
 )
