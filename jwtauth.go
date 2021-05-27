@@ -13,6 +13,7 @@ import (
 
 type JWTAuth struct {
 	alg       jwa.SignatureAlgorithm
+	cookies   []string
 	signKey   interface{} // private-key
 	verifyKey interface{} // public-key, only used by RSA and ECDSA algorithms
 	verifier  jwt.ParseOption
@@ -52,8 +53,14 @@ func WithVerifier(verifier jwt.ParseOption) Option {
 	}
 }
 
+func WithCookies(cookies ...string) Option {
+	return func(ja *JWTAuth) {
+		ja.cookies = cookies
+	}
+}
+
 func New(alg string, options ...Option) *JWTAuth {
-	ja := &JWTAuth{alg: jwa.SignatureAlgorithm(alg)}
+	ja := &JWTAuth{alg: jwa.SignatureAlgorithm(alg), cookies: []string{"jwt"}}
 
 	for _, option := range options {
 		option(ja)
@@ -90,7 +97,7 @@ func New(alg string, options ...Option) *JWTAuth {
 // http response.
 func Verifier(ja *JWTAuth) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
-		return Verify(ja, TokenFromHeader, TokenFromCookie)(next)
+		return Verify(ja, TokenFromHeader, TokenFromCookies(ja.cookies...))(next)
 	}
 }
 
@@ -268,14 +275,17 @@ func SetExpiryIn(claims map[string]interface{}, tm time.Duration) {
 	claims["exp"] = ExpireIn(tm)
 }
 
-// TokenFromCookie tries to retreive the token string from a cookie named
-// "jwt".
-func TokenFromCookie(r *http.Request) string {
-	cookie, err := r.Cookie("jwt")
-	if err != nil {
+// TokenFromCookies tries to retreive the token string from a cookie.
+func TokenFromCookies(cookies ...string) func(*http.Request) string {
+	return func(r *http.Request) string {
+		for _, cookie := range cookies {
+			cookie, err := r.Cookie(cookie)
+			if err == nil {
+				return cookie.Value
+			}
+		}
 		return ""
 	}
-	return cookie.Value
 }
 
 // TokenFromHeader tries to retreive the token string from the
