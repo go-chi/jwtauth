@@ -32,8 +32,36 @@ var (
 	ErrAlgoInvalid  = errors.New("algorithm mismatch")
 )
 
-func New(alg string, signKey interface{}, verifyKey interface{}) *JWTAuth {
-	ja := &JWTAuth{alg: jwa.SignatureAlgorithm(alg), signKey: signKey, verifyKey: verifyKey}
+type Option func(*JWTAuth)
+
+func WithSigningKey(key interface{}) Option {
+	return func(ja *JWTAuth) {
+		ja.signKey = key
+	}
+}
+
+func WithVerificationKey(key interface{}) Option {
+	return func(ja *JWTAuth) {
+		ja.verifyKey = key
+	}
+}
+
+func WithVerifier(verifier jwt.ParseOption) Option {
+	return func(ja *JWTAuth) {
+		ja.verifier = verifier
+	}
+}
+
+func New(alg string, options ...Option) *JWTAuth {
+	ja := &JWTAuth{alg: jwa.SignatureAlgorithm(alg)}
+
+	for _, option := range options {
+		option(ja)
+	}
+
+	if ja.verifier != nil {
+		return ja
+	}
 
 	if ja.verifyKey != nil {
 		ja.verifier = jwt.WithVerify(ja.alg, ja.verifyKey)
