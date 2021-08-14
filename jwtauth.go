@@ -66,6 +66,20 @@ func Verifier(ja *JWTAuth) func(http.Handler) http.Handler {
 	}
 }
 
+// Verify http middleware handler will verify a JWT string from a http request.
+//
+// Verify will search for a JWT token in a http request using token find 
+// functions in order they were provided, stopping further extraction on first 
+// non-empty string returned.
+//
+// The first JWT string found is then decoded by the `jwt-go` library and a *jwt.Token
+// object is set on the request context. In the case of a signature decoding error
+// the Verify will also set the error on the request context.
+//
+// The Verify always calls the next http handler in sequence, which can either
+// be the generic `jwtauth.Authenticator` middleware or your own custom handler
+// which checks the request context jwt token and error to prepare a custom
+// http response.
 func Verify(ja *JWTAuth, findTokenFns ...func(r *http.Request) string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		hfn := func(w http.ResponseWriter, r *http.Request) {
@@ -78,18 +92,20 @@ func Verify(ja *JWTAuth, findTokenFns ...func(r *http.Request) string) func(http
 	}
 }
 
+// VerifyRequest extracts the JWT token from request by calling token find functions in 
+// the order they were provided stopping further extraction if a function returns a 
+// non-empty string, and validates the extracted token returning either the token or the 
+// verification error.
 func VerifyRequest(ja *JWTAuth, r *http.Request, findTokenFns ...func(r *http.Request) string) (jwt.Token, error) {
 	var tokenString string
-
-	// Extract token string from the request by calling token find functions in
-	// the order they where provided. Further extraction stops if a function
-	// returns a non-empty string.
+	
 	for _, fn := range findTokenFns {
 		tokenString = fn(r)
 		if tokenString != "" {
 			break
 		}
 	}
+	
 	if tokenString == "" {
 		return nil, ErrNoTokenFound
 	}
@@ -97,6 +113,8 @@ func VerifyRequest(ja *JWTAuth, r *http.Request, findTokenFns ...func(r *http.Re
 	return VerifyToken(ja, tokenString)
 }
 
+// VerifyToken decodes and verifies the token string returning either 
+// verified token or an error.
 func VerifyToken(ja *JWTAuth, tokenString string) (jwt.Token, error) {
 	// Decode & verify the token
 	token, err := ja.Decode(tokenString)
@@ -179,12 +197,17 @@ func Authenticator(next http.Handler) http.Handler {
 	})
 }
 
+// NewContext returns a copy of parent context in which 
+// the TokenCtxKey is associated with t and
+// the ErrorCtxKey is associated with err.
 func NewContext(ctx context.Context, t jwt.Token, err error) context.Context {
 	ctx = context.WithValue(ctx, TokenCtxKey, t)
 	ctx = context.WithValue(ctx, ErrorCtxKey, err)
 	return ctx
 }
 
+// FromContext extracts the jwt.Token and token claims or returns an error
+// if not succeeded
 func FromContext(ctx context.Context) (jwt.Token, map[string]interface{}, error) {
 	token, _ := ctx.Value(TokenCtxKey).(jwt.Token)
 
