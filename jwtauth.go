@@ -44,6 +44,10 @@ func New(alg string, signKey interface{}, verifyKey interface{}) *JWTAuth {
 	return ja
 }
 
+func WithParseOption(alg string, verifier jwt.ParseOption) *JWTAuth {
+	return &JWTAuth{alg: jwa.SignatureAlgorithm(alg), verifier: verifier}
+}
+
 // Verifier http middleware handler will verify a JWT string from a http request.
 //
 // Verifier will search for a JWT token in a http request, in the order:
