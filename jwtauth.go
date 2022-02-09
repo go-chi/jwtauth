@@ -61,9 +61,7 @@ func New(alg string, signKey interface{}, verifyKey interface{}) *JWTAuth {
 // which checks the request context jwt token and error to prepare a custom
 // http response.
 func Verifier(ja *JWTAuth) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return Verify(ja, TokenFromHeader, TokenFromCookie)(next)
-	}
+	return Verify(ja, TokenFromHeader, TokenFromCookie)
 }
 
 func Verify(ja *JWTAuth, findTokenFns ...func(r *http.Request) string) func(http.Handler) http.Handler {
@@ -165,12 +163,12 @@ func Authenticator(next http.Handler) http.Handler {
 		token, _, err := FromContext(r.Context())
 
 		if err != nil {
-			http.Error(w, err.Error(), 401)
+			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return
 		}
 
 		if token == nil || jwt.Validate(token) != nil {
-			http.Error(w, http.StatusText(401), 401)
+			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 			return
 		}
 
