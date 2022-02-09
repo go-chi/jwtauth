@@ -153,12 +153,12 @@ func TestMore(t *testing.T) {
 				token, _, err := jwtauth.FromContext(r.Context())
 
 				if err != nil {
-					http.Error(w, jwtauth.ErrorReason(err).Error(), 401)
+					http.Error(w, jwtauth.ErrorReason(err).Error(), http.StatusUnauthorized)
 					return
 				}
 
 				if err := jwt.Validate(token); err != nil {
-					http.Error(w, jwtauth.ErrorReason(err).Error(), 401)
+					http.Error(w, jwtauth.ErrorReason(err).Error(), http.StatusUnauthorized)
 					return
 				}
 
@@ -242,10 +242,8 @@ func testRequest(t *testing.T, ts *httptest.Server, method, path string, header 
 		return 0, ""
 	}
 
-	if header != nil {
-		for k, v := range header {
-			req.Header.Set(k, v[0])
-		}
+	for k, v := range header {
+		req.Header.Set(k, v[0])
 	}
 
 	resp, err := http.DefaultClient.Do(req)
