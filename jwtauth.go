@@ -12,10 +12,12 @@ import (
 )
 
 type JWTAuth struct {
-	alg       jwa.SignatureAlgorithm
-	signKey   interface{} // private-key
-	verifyKey interface{} // public-key, only used by RSA and ECDSA algorithms
+	// private-key
+	signKey interface{}
+	// public-key, only used by RSA and ECDSA algorithms
+	verifyKey interface{}
 	verifier  jwt.ParseOption
+	alg       jwa.SignatureAlgorithm
 }
 
 var (
@@ -161,7 +163,6 @@ func ErrorReason(err error) error {
 func Authenticator(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token, _, err := FromContext(r.Context())
-
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return
@@ -187,15 +188,13 @@ func FromContext(ctx context.Context) (jwt.Token, map[string]interface{}, error)
 	token, _ := ctx.Value(TokenCtxKey).(jwt.Token)
 
 	var err error
-	var claims map[string]interface{}
+	claims := map[string]interface{}{}
 
 	if token != nil {
 		claims, err = token.AsMap(context.Background())
 		if err != nil {
 			return token, nil, err
 		}
-	} else {
-		claims = map[string]interface{}{}
 	}
 
 	err, _ = ctx.Value(ErrorCtxKey).(error)
