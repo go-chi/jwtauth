@@ -1,4 +1,4 @@
-package kjwtauth
+package jwtauth
 
 import (
 	"context"
