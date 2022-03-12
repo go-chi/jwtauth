@@ -5,6 +5,8 @@ github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.0-20210816181553-5444fa50b93d h1:
 github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.0-20210816181553-5444fa50b93d/go.mod h1:tmAIfUFEirG/Y8jhZ9M+h36obRZAk/1fcSpXwAVlfqE=
 github.com/go-chi/chi/v5 v5.0.4 h1:5e494iHzsYBiyXQAHHuI4tyJS9M3V84OuX3ufIIGHFo=
 github.com/go-chi/chi/v5 v5.0.4/go.mod h1:DslCQbL2OYiznFReuXYUmQ2hGd1aDpCnlMNITLSKoi8=
+github.com/go-chi/jwtauth/v5 v5.0.2 h1:CSKtr+b6Jnfy5T27sMaiBPxaVE/bjnjS3ramFQ0526w=
+github.com/go-chi/jwtauth/v5 v5.0.2/go.mod h1:TeA7vmPe3uYThvHw8O8W13HOOpOd4MTgToxL41gZyjs=
 github.com/goccy/go-json v0.7.6 h1:H0wq4jppBQ+9222sk5+hPLL25abZQiRuQ6YPnjO9c+A=
 github.com/goccy/go-json v0.7.6/go.mod h1:6MelG93GURQebXPDq3khkgXZkazVtN9CRI+MGFi0w8I=
 github.com/lestrrat-go/backoff/v2 v2.0.8 h1:oNb5E5isby2kiro9AgdHLv5N5tint1AnDVVf2E2un5A=
