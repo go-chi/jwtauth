@@ -1,4 +1,4 @@
-module github.com/Sarthak160/go-chi/jwtauth/v5
+module github.com/go-chi/kjwtauth/v5
 
 go 1.15
 
