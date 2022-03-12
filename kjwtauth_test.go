@@ -1,4 +1,4 @@
-package jwtauth_test
+package kjwtauth_test
 
 import (
 	"context"
