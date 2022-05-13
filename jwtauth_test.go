@@ -305,6 +305,99 @@ func TestMore(t *testing.T) {
 	}
 }
 
+func TestDynamic(t *testing.T) {
+	anotherKeySet := `{
+    "keys": [
+		{
+			"kty": "RSA",
+			"n": "vGjc8KMXDhCOA5fTpAIkgkGddc2IRjAMvHFrn_tDIfrLvucJFDInfHdTAX2tQPREKyniw11fmQ5D09TIfI60JQ",
+			"e": "AQAB",
+            "alg": "RS256",
+            "kid": "anotherKID",
+            "use": "sig"
+        }
+	]
+}`
+
+	privateKeyBlock, _ := pem.Decode([]byte(PrivateKeyRS256String))
+	privateKey, err := x509.ParsePKCS1PrivateKey(privateKeyBlock.Bytes)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+
+	r := chi.NewRouter()
+
+	keySet := []byte(KeySet)
+	keySetPtr := &keySet
+
+	dynamicJWTAuthFunc := func() (*jwtauth.JWTAuth, error) {
+		keySet, err := jwtauth.NewKeySet(*keySetPtr)
+		if err != nil {
+			return nil, err
+		}
+		return keySet, nil
+	}
+
+	// Protected routes
+	r.Group(func(r chi.Router) {
+		r.Use(jwtauth.VerifierDynamic(dynamicJWTAuthFunc))
+
+		authenticator := func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				token, _, err := jwtauth.FromContext(r.Context())
+
+				if err != nil {
+					http.Error(w, jwtauth.ErrorReason(err).Error(), http.StatusUnauthorized)
+					return
+				}
+
+				if err := jwt.Validate(token); err != nil {
+					http.Error(w, jwtauth.ErrorReason(err).Error(), http.StatusUnauthorized)
+					return
+				}
+
+				// Token is authenticated, pass it through
+				next.ServeHTTP(w, r)
+			})
+		}
+		r.Use(authenticator)
+
+		r.Get("/admin", func(w http.ResponseWriter, r *http.Request) {
+			_, claims, err := jwtauth.FromContext(r.Context())
+
+			if err != nil {
+				w.Write([]byte(fmt.Sprintf("error! %v", err)))
+				return
+			}
+
+			w.Write([]byte(fmt.Sprintf("protected, user:%v", claims["user_id"])))
+		})
+	})
+
+	// Public routes
+	r.Group(func(r chi.Router) {
+		r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+			w.Write([]byte("welcome"))
+		})
+	})
+
+	ts := httptest.NewServer(r)
+	defer ts.Close()
+
+	h := http.Header{}
+	h.Set("Authorization", "BEARER "+newJwtToken(jwa.RS256, privateKey, "1", map[string]interface{}{"user_id": 31337, "exp": jwtauth.ExpireIn(5 * time.Minute)}))
+	if status, resp := testRequest(t, ts, "GET", "/admin", h, nil); status != 200 || resp != "protected, user:31337" {
+		t.Fatalf(resp)
+	}
+
+	// dynamically modifying JWTAuth return so kid 1 is no longer supported
+	*keySetPtr = []byte(anotherKeySet)
+	h.Set("Authorization", "BEARER "+newJwtToken(jwa.RS256, privateKey, "1", map[string]interface{}{"user_id": 31337, "exp": jwtauth.ExpireIn(5 * time.Minute)}))
+	if status, resp := testRequest(t, ts, "GET", "/admin", h, nil); status != 401 || resp != "token is unauthorized\n" {
+		t.Fatalf(resp)
+	}
+}
+
 //
 // Test helper functions
 //
