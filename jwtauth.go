@@ -2,12 +2,15 @@ package jwtauth
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/lestrrat-go/jwx/v2/jwa"
+	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/lestrrat-go/jwx/v2/jwt"
 )
 
@@ -17,6 +20,7 @@ type JWTAuth struct {
 	verifyKey       interface{} // public-key, only used by RSA and ECDSA algorithms
 	verifier        jwt.ParseOption
 	validateOptions []jwt.ValidateOption
+	keySet          jwk.Set
 }
 
 var (
@@ -50,6 +54,19 @@ func New(alg string, signKey interface{}, verifyKey interface{}, validateOptions
 	return ja
 }
 
+func NewKeySet(set []byte) (*JWTAuth, error) {
+	keySet := jwk.NewSet()
+	err := json.Unmarshal(set, &keySet)
+	if err != nil {
+		return nil, err
+	}
+
+	ja := &JWTAuth{keySet: keySet}
+	ja.verifier = jwt.WithKeySet(keySet)
+
+	return ja, nil
+}
+
 // Verifier http middleware handler will verify a JWT string from a http request.
 //
 // Verifier will search for a JWT token in a http request, in the order:
@@ -69,7 +86,10 @@ func Verifier(ja *JWTAuth) func(http.Handler) http.Handler {
 	return Verify(ja, TokenFromHeader, TokenFromCookie)
 }
 
-func Verify(ja *JWTAuth, findTokenFns ...func(r *http.Request) string) func(http.Handler) http.Handler {
+func Verify(ja *JWTAuth, findTokenFns ...func(r *http.
+	Request) string) func(
+	http.
+		Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		hfn := func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
@@ -120,6 +140,10 @@ func VerifyToken(ja *JWTAuth, tokenString string) (jwt.Token, error) {
 }
 
 func (ja *JWTAuth) Encode(claims map[string]interface{}) (t jwt.Token, tokenString string, err error) {
+	if ja.keySet != nil {
+		return nil, "", fmt.Errorf("encode not supported")
+	}
+
 	t = jwt.New()
 	for k, v := range claims {
 		t.Set(k, v)
