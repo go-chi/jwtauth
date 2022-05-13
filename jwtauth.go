@@ -2,13 +2,16 @@ package jwtauth
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
 
-	"github.com/lestrrat-go/jwx/jwa"
-	"github.com/lestrrat-go/jwx/jwt"
+	"github.com/lestrrat-go/jwx/v2/jwa"
+	"github.com/lestrrat-go/jwx/v2/jwk"
+	"github.com/lestrrat-go/jwx/v2/jwt"
 )
 
 type JWTAuth struct {
@@ -16,6 +19,7 @@ type JWTAuth struct {
 	signKey   interface{} // private-key
 	verifyKey interface{} // public-key, only used by RSA and ECDSA algorithms
 	verifier  jwt.ParseOption
+	keySet    jwk.Set
 }
 
 var (
@@ -35,13 +39,27 @@ var (
 func New(alg string, signKey interface{}, verifyKey interface{}) *JWTAuth {
 	ja := &JWTAuth{alg: jwa.SignatureAlgorithm(alg), signKey: signKey, verifyKey: verifyKey}
 
+	algorithm := jwa.KeyAlgorithmFrom(ja.alg)
 	if ja.verifyKey != nil {
-		ja.verifier = jwt.WithVerify(ja.alg, ja.verifyKey)
+		ja.verifier = jwt.WithKey(algorithm, ja.verifyKey)
 	} else {
-		ja.verifier = jwt.WithVerify(ja.alg, ja.signKey)
+		ja.verifier = jwt.WithKey(algorithm, ja.signKey)
 	}
 
 	return ja
+}
+
+func NewKeySet(set []byte) (*JWTAuth, error) {
+	keySet := jwk.NewSet()
+	err := json.Unmarshal(set, &keySet)
+	if err != nil {
+		return nil, err
+	}
+
+	ja := &JWTAuth{keySet: keySet}
+	ja.verifier = jwt.WithKeySet(keySet)
+
+	return ja, nil
 }
 
 // Verifier http middleware handler will verify a JWT string from a http request.
@@ -64,7 +82,10 @@ func Verifier(ja *JWTAuth) func(http.Handler) http.Handler {
 	return Verify(ja, TokenFromHeader, TokenFromCookie)
 }
 
-func Verify(ja *JWTAuth, findTokenFns ...func(r *http.Request) string) func(http.Handler) http.Handler {
+func Verify(ja *JWTAuth, findTokenFns ...func(r *http.
+	Request) string) func(
+	http.
+		Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		hfn := func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
@@ -115,6 +136,10 @@ func VerifyToken(ja *JWTAuth, tokenString string) (jwt.Token, error) {
 }
 
 func (ja *JWTAuth) Encode(claims map[string]interface{}) (t jwt.Token, tokenString string, err error) {
+	if ja.keySet != nil {
+		return nil, "", fmt.Errorf("encode not supported")
+	}
+
 	t = jwt.New()
 	for k, v := range claims {
 		t.Set(k, v)
@@ -132,7 +157,7 @@ func (ja *JWTAuth) Decode(tokenString string) (jwt.Token, error) {
 }
 
 func (ja *JWTAuth) sign(token jwt.Token) ([]byte, error) {
-	return jwt.Sign(token, ja.alg, ja.signKey)
+	return jwt.Sign(token, jwt.WithKey(ja.alg, ja.signKey))
 }
 
 func (ja *JWTAuth) parse(payload []byte) (jwt.Token, error) {
@@ -143,11 +168,11 @@ func (ja *JWTAuth) parse(payload []byte) (jwt.Token, error) {
 // jwt library
 func ErrorReason(err error) error {
 	switch err.Error() {
-	case "exp not satisfied", ErrExpired.Error():
+	case jwt.ErrTokenExpired().Error(), ErrExpired.Error():
 		return ErrExpired
-	case "iat not satisfied", ErrIATInvalid.Error():
+	case jwt.ErrInvalidIssuedAt().Error(), ErrIATInvalid.Error():
 		return ErrIATInvalid
-	case "nbf not satisfied", ErrNBFInvalid.Error():
+	case jwt.ErrTokenNotYetValid().Error(), ErrNBFInvalid.Error():
 		return ErrNBFInvalid
 	default:
 		return ErrUnauthorized

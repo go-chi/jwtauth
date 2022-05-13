@@ -5,6 +5,8 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"github.com/lestrrat-go/jwx/v2/jwa"
+	"github.com/lestrrat-go/jwx/v2/jws"
 	"io"
 	"io/ioutil"
 	"log"
@@ -16,7 +18,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/jwtauth/v5"
-	"github.com/lestrrat-go/jwx/jwt"
+	"github.com/lestrrat-go/jwx/v2/jwt"
 )
 
 var (
@@ -41,6 +43,27 @@ MFwwDQYJKoZIhvcNAQEBBQADSwAwSAJBALxo3PCjFw4QjgOX06QCJIJBnXXNiEYw
 DLxxa5/7QyH6y77nCRQyJ3x3UwF9rUD0RCsp4sNdX5kOQ9PUyHyOtCUCAwEAAQ==
 -----END PUBLIC KEY-----
 `
+
+	KeySet = `{
+    "keys": [
+		{
+			"kty": "RSA",
+			"n": "vGjc8KMXDhCOA5fTpAIkgkGddc2IRjAMvHFrn_tDIfrLvucJFDInfHdTAX2tQPREKyniw11fmQ5D09TIfI60JQ",
+			"e": "AQAB",
+            "alg": "RS256",
+            "kid": "1",
+            "use": "sig"
+        },
+		{
+			"kty": "RSA",
+			"n": "foo",
+			"e": "AQAB",
+            "alg": "RS256",
+            "kid": "2",
+            "use": "sig"
+        }
+    ]
+}`
 )
 
 func init() {
@@ -50,6 +73,18 @@ func init() {
 //
 // Tests
 //
+
+func TestNewKeySet(t *testing.T) {
+	_, err := jwtauth.NewKeySet([]byte("not a valid key set"))
+	if err == nil {
+		t.Fatal("The error should not be nil")
+	}
+
+	_, err = jwtauth.NewKeySet([]byte(KeySet))
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+}
 
 func TestSimpleRSA(t *testing.T) {
 	privateKeyBlock, _ := pem.Decode([]byte(PrivateKeyRS256String))
@@ -98,6 +133,45 @@ func TestSimpleRSA(t *testing.T) {
 	}
 }
 
+func TestKeySetRSA(t *testing.T) {
+	privateKeyBlock, _ := pem.Decode([]byte(PrivateKeyRS256String))
+
+	privateKey, err := x509.ParsePKCS1PrivateKey(privateKeyBlock.Bytes)
+
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+
+	KeySetAuth, _ := jwtauth.NewKeySet([]byte(KeySet))
+	claims := map[string]interface{}{
+		"key":  "val",
+		"key2": "val2",
+		"key3": "val3",
+	}
+
+	signed := newJwtToken(jwa.RS256, privateKey, "1", claims)
+
+	token, err := KeySetAuth.Decode(signed)
+
+	if err != nil {
+		t.Fatalf("Failed to decode token string %s\n", err.Error())
+	}
+
+	tokenClaims, err := token.AsMap(context.Background())
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+
+	if !reflect.DeepEqual(claims, tokenClaims) {
+		t.Fatalf("The decoded claims don't match the original ones\n")
+	}
+
+	_, _, err = KeySetAuth.Encode(claims)
+	if err.Error() != "encode not supported" {
+		t.Fatalf("Expect error to equal %s. Found: %s.", "encode not supported", err.Error())
+	}
+}
+
 func TestSimple(t *testing.T) {
 	r := chi.NewRouter()
 
@@ -116,7 +190,7 @@ func TestSimple(t *testing.T) {
 	}
 
 	h := http.Header{}
-	h.Set("Authorization", "BEARER "+newJwtToken([]byte("wrong"), map[string]interface{}{}))
+	h.Set("Authorization", "BEARER "+newJwtToken(jwa.HS256, []byte("wrong"), "", map[string]interface{}{}))
 	if status, resp := testRequest(t, ts, "GET", "/", h, nil); status != 401 || resp != "token is unauthorized\n" {
 		t.Fatalf(resp)
 	}
@@ -125,12 +199,12 @@ func TestSimple(t *testing.T) {
 		t.Fatalf(resp)
 	}
 	// wrong token secret and wrong alg
-	h.Set("Authorization", "BEARER "+newJwt512Token([]byte("wrong"), map[string]interface{}{}))
+	h.Set("Authorization", "BEARER "+newJwtToken(jwa.HS512, []byte("wrong"), "", map[string]interface{}{}))
 	if status, resp := testRequest(t, ts, "GET", "/", h, nil); status != 401 || resp != "token is unauthorized\n" {
 		t.Fatalf(resp)
 	}
 	// correct token secret but wrong alg
-	h.Set("Authorization", "BEARER "+newJwt512Token(TokenSecret, map[string]interface{}{}))
+	h.Set("Authorization", "BEARER "+newJwtToken(jwa.HS512, TokenSecret, "", map[string]interface{}{}))
 	if status, resp := testRequest(t, ts, "GET", "/", h, nil); status != 401 || resp != "token is unauthorized\n" {
 		t.Fatalf(resp)
 	}
@@ -196,7 +270,7 @@ func TestMore(t *testing.T) {
 	}
 
 	h := http.Header{}
-	h.Set("Authorization", "BEARER "+newJwtToken([]byte("wrong"), map[string]interface{}{}))
+	h.Set("Authorization", "BEARER "+newJwtToken(jwa.HS256, []byte("wrong"), "", map[string]interface{}{}))
 	if status, resp := testRequest(t, ts, "GET", "/admin", h, nil); status != 401 || resp != "token is unauthorized\n" {
 		t.Fatalf(resp)
 	}
@@ -205,12 +279,12 @@ func TestMore(t *testing.T) {
 		t.Fatalf(resp)
 	}
 	// wrong token secret and wrong alg
-	h.Set("Authorization", "BEARER "+newJwt512Token([]byte("wrong"), map[string]interface{}{}))
+	h.Set("Authorization", "BEARER "+newJwtToken(jwa.HS512, []byte("wrong"), "", map[string]interface{}{}))
 	if status, resp := testRequest(t, ts, "GET", "/admin", h, nil); status != 401 || resp != "token is unauthorized\n" {
 		t.Fatalf(resp)
 	}
 	// correct token secret but wrong alg
-	h.Set("Authorization", "BEARER "+newJwt512Token(TokenSecret, map[string]interface{}{}))
+	h.Set("Authorization", "BEARER "+newJwtToken(jwa.HS512, TokenSecret, "", map[string]interface{}{}))
 	if status, resp := testRequest(t, ts, "GET", "/admin", h, nil); status != 401 || resp != "token is unauthorized\n" {
 		t.Fatalf(resp)
 	}
@@ -262,29 +336,23 @@ func testRequest(t *testing.T, ts *httptest.Server, method, path string, header 
 	return resp.StatusCode, string(respBody)
 }
 
-func newJwtToken(secret []byte, claims ...map[string]interface{}) string {
+func newJwtToken(alg jwa.SignatureAlgorithm, secret interface{}, kid string, claims ...map[string]interface{}) string {
 	token := jwt.New()
 	if len(claims) > 0 {
 		for k, v := range claims[0] {
 			token.Set(k, v)
 		}
 	}
-	tokenPayload, err := jwt.Sign(token, "HS256", secret)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return string(tokenPayload)
-}
 
-func newJwt512Token(secret []byte, claims ...map[string]interface{}) string {
-	// use-case: when token is signed with a different alg than expected
-	token := jwt.New()
-	if len(claims) > 0 {
-		for k, v := range claims[0] {
-			token.Set(k, v)
+	headers := jws.NewHeaders()
+	if kid != "" {
+		err := headers.Set("kid", kid)
+		if err != nil {
+			log.Fatal(err)
 		}
 	}
-	tokenPayload, err := jwt.Sign(token, "HS512", secret)
+
+	tokenPayload, err := jwt.Sign(token, jwt.WithKey(alg, secret, jws.WithProtectedHeaders(headers)))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -293,6 +361,6 @@ func newJwt512Token(secret []byte, claims ...map[string]interface{}) string {
 
 func newAuthHeader(claims ...map[string]interface{}) http.Header {
 	h := http.Header{}
-	h.Set("Authorization", "BEARER "+newJwtToken(TokenSecret, claims...))
+	h.Set("Authorization", "BEARER "+newJwtToken(jwa.HS256, TokenSecret, "", claims...))
 	return h
 }
