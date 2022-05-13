@@ -68,6 +68,18 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jwt"
 )
 
+type dynamicTokenAuth struct {
+	keySet []byte
+}
+
+func (d *dynamicTokenAuth) JWTAuth() (*jwtauth.JWTAuth, error) {
+	keySet, err := jwtauth.NewKeySet(d.keySet)
+	if err != nil {
+		return nil, err
+	}
+	return keySet, nil
+}
+
 var tokenAuth *jwtauth.JWTAuth
 
 func init() {
@@ -76,7 +88,8 @@ func init() {
 	// For debugging/example purposes, we generate and print
 	// a sample jwt token with claims `user_id:123` here:
 	_, tokenString, _ := tokenAuth.Encode(map[string]interface{}{"user_id": 123})
-	fmt.Printf("DEBUG: a sample jwt is %s\n\n", tokenString)
+	fmt.Printf("DEBUG: a sample jwt for /admin is %s\n\n", tokenString)
+	fmt.Printf("DEBUG: a sample jwt for /rotate is %s\n\n", sampleJWTRotate)
 }
 
 func main() {
@@ -105,6 +118,23 @@ func router() http.Handler {
 		})
 	})
 
+	r.Group(func(r chi.Router) {
+		dynamicTokenAuth := dynamicTokenAuth{keySet: keySet}
+		// Seek, verify and validate JWT tokens based on keys returned by the callback function
+		r.Use(jwtauth.VerifierDynamic(dynamicTokenAuth.JWTAuth))
+
+		// Handle valid / invalid tokens. In this example, we use
+		// the provided authenticator middleware, but you can write your
+		// own very easily, look at the Authenticator method in jwtauth.go
+		// and tweak it, its not scary.
+		r.Use(jwtauth.Authenticator)
+
+		r.Get("/rotate", func(w http.ResponseWriter, r *http.Request) {
+			_, claims, _ := jwtauth.FromContext(r.Context())
+			w.Write([]byte(fmt.Sprintf("protected area. hi %v", claims["user_id"])))
+		})
+	})
+
 	// Public routes
 	r.Group(func(r chi.Router) {
 		r.Get("/", func(w http.ResponseWriter, r *http.Request) {
@@ -114,3 +144,20 @@ func router() http.Handler {
 
 	return r
 }
+
+var (
+	keySet = []byte(`{
+    "keys": [
+		{
+			"kty": "RSA",
+            "alg": "RS256",
+            "kid": "kid",
+            "use": "sig",
+			"n": "rgzO_v14UXJ33MvccKI8aIw3YpknVJbRB-m1z1X4j3gaTmmzmb7_naEd1TOKhF6Z1BGupvAKhCs8uHtp5e1PCrp52kzrjv7nqQfDpdppPZmKpwf-OD_lVgLLuCljB71mX9w7T5vI_WiVknuNhm48y0TJQNslpDZum4E2e0BLKUDRKKlo25foGoDuQN535_Xso861U8KsA80jX37BJplQ6IHewV_bbe04NYTVqaFcmLaZCAzh2f8L1h4xt76Y0xF_u8FXt2-rgcWlz17CtZzxC8ZXNI_92pX8CY5LY2eQf_B_n5Rhd5TQvEIdoI1GNBrcKUI9pMeEC4pErcOGgKGH7w",
+			"e": "AQAB"
+        }
+	]
+}`)
+
+	sampleJWTRotate = `eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImtpZCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.APC4bUOmfbcXjBnZnmyiGBpXqlboTB4Qbh_sqJrgSU5AEQlwzjvDJ79eBlty8h6kfq3i5ffy87s-g82ZoRsHqMjwCIvTOVnoEyDgVu68s9lE32uaA0cc2-hbA13DIBsyIUGjehh9c3h93BrUoUr7n0CHgoKgx2OEw1Bq8vm4EqvmFGF-mr_0qi32uudPy3I15SyP1NJfU0ogQEFUdDHww3c8omDmrTPiGlWZAl9AiBMroDu0nq3UOtC4d5Se-361NEGiZ9J_kHcVWGdoMwsi5KEB0Uf3wAfXK3wcXeRu1pTXYKOV3X3g_2ss6mh65bNMsSx-MZUnQv5v6qZMOxMBUA`
+)
