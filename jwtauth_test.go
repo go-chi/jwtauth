@@ -6,7 +6,6 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"net/http/httptest"
@@ -16,7 +15,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/jwtauth/v5"
-	"github.com/lestrrat-go/jwx/jwt"
+	"github.com/lestrrat-go/jwx/v2/jwa"
+	"github.com/lestrrat-go/jwx/v2/jwt"
 )
 
 var (
@@ -44,7 +44,7 @@ DLxxa5/7QyH6y77nCRQyJ3x3UwF9rUD0RCsp4sNdX5kOQ9PUyHyOtCUCAwEAAQ==
 )
 
 func init() {
-	TokenAuthHS256 = jwtauth.New("HS256", TokenSecret, nil)
+	TokenAuthHS256 = jwtauth.New(jwa.HS256.String(), TokenSecret, nil)
 }
 
 //
@@ -68,7 +68,7 @@ func TestSimpleRSA(t *testing.T) {
 		t.Fatalf(err.Error())
 	}
 
-	TokenAuthRS256 = jwtauth.New("RS256", privateKey, publicKey)
+	TokenAuthRS256 = jwtauth.New(jwa.RS256.String(), privateKey, publicKey)
 
 	claims := map[string]interface{}{
 		"key":  "val",
@@ -252,7 +252,7 @@ func testRequest(t *testing.T, ts *httptest.Server, method, path string, header 
 		return 0, ""
 	}
 
-	respBody, err := ioutil.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatal(err)
 		return 0, ""
@@ -269,7 +269,7 @@ func newJwtToken(secret []byte, claims ...map[string]interface{}) string {
 			token.Set(k, v)
 		}
 	}
-	tokenPayload, err := jwt.Sign(token, "HS256", secret)
+	tokenPayload, err := jwt.Sign(token, jwt.WithKey(jwa.HS256, secret))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -284,7 +284,7 @@ func newJwt512Token(secret []byte, claims ...map[string]interface{}) string {
 			token.Set(k, v)
 		}
 	}
-	tokenPayload, err := jwt.Sign(token, "HS512", secret)
+	tokenPayload, err := jwt.Sign(token, jwt.WithKey(jwa.HS512, secret))
 	if err != nil {
 		log.Fatal(err)
 	}
