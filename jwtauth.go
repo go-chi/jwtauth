@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lestrrat-go/jwx/jwa"
-	"github.com/lestrrat-go/jwx/jwt"
+	"github.com/lestrrat-go/jwx/v2/jwa"
+	"github.com/lestrrat-go/jwx/v2/jwt"
 )
 
 type JWTAuth struct {
@@ -36,9 +36,9 @@ func New(alg string, signKey interface{}, verifyKey interface{}) *JWTAuth {
 	ja := &JWTAuth{alg: jwa.SignatureAlgorithm(alg), signKey: signKey, verifyKey: verifyKey}
 
 	if ja.verifyKey != nil {
-		ja.verifier = jwt.WithVerify(ja.alg, ja.verifyKey)
+		ja.verifier = jwt.WithKey(ja.alg, ja.verifyKey)
 	} else {
-		ja.verifier = jwt.WithVerify(ja.alg, ja.signKey)
+		ja.verifier = jwt.WithKey(ja.alg, ja.signKey)
 	}
 
 	return ja
@@ -47,9 +47,9 @@ func New(alg string, signKey interface{}, verifyKey interface{}) *JWTAuth {
 // Verifier http middleware handler will verify a JWT string from a http request.
 //
 // Verifier will search for a JWT token in a http request, in the order:
-//   1. 'jwt' URI query parameter
-//   2. 'Authorization: BEARER T' request header
-//   3. Cookie 'jwt' value
+//  1. 'jwt' URI query parameter
+//  2. 'Authorization: BEARER T' request header
+//  3. Cookie 'jwt' value
 //
 // The first JWT string that is found as a query parameter, authorization header
 // or cookie header is then decoded by the `jwt-go` library and a *jwt.Token
@@ -132,22 +132,23 @@ func (ja *JWTAuth) Decode(tokenString string) (jwt.Token, error) {
 }
 
 func (ja *JWTAuth) sign(token jwt.Token) ([]byte, error) {
-	return jwt.Sign(token, ja.alg, ja.signKey)
+	return jwt.Sign(token, jwt.WithKey(ja.alg, ja.signKey))
 }
 
 func (ja *JWTAuth) parse(payload []byte) (jwt.Token, error) {
-	return jwt.Parse(payload, ja.verifier)
+	// we disable validation here because we use jwt.Validate to validate tokens
+	return jwt.Parse(payload, ja.verifier, jwt.WithValidate(false))
 }
 
 // ErrorReason will normalize the error message from the underlining
 // jwt library
 func ErrorReason(err error) error {
-	switch err.Error() {
-	case "exp not satisfied", ErrExpired.Error():
+	switch {
+	case errors.Is(err, jwt.ErrTokenExpired()), err == ErrExpired:
 		return ErrExpired
-	case "iat not satisfied", ErrIATInvalid.Error():
+	case errors.Is(err, jwt.ErrInvalidIssuedAt()), err == ErrIATInvalid:
 		return ErrIATInvalid
-	case "nbf not satisfied", ErrNBFInvalid.Error():
+	case errors.Is(err, jwt.ErrTokenNotYetValid()), err == ErrNBFInvalid:
 		return ErrNBFInvalid
 	default:
 		return ErrUnauthorized
@@ -264,11 +265,11 @@ func TokenFromHeader(r *http.Request) string {
 //
 // To use it, build our own middleware handler, such as:
 //
-// func Verifier(ja *JWTAuth) func(http.Handler) http.Handler {
-// 	return func(next http.Handler) http.Handler {
-// 		return Verify(ja, TokenFromQuery, TokenFromHeader, TokenFromCookie)(next)
-// 	}
-// }
+//	func Verifier(ja *JWTAuth) func(http.Handler) http.Handler {
+//		return func(next http.Handler) http.Handler {
+//			return Verify(ja, TokenFromQuery, TokenFromHeader, TokenFromCookie)(next)
+//		}
+//	}
 func TokenFromQuery(r *http.Request) string {
 	// Get token from query param named "jwt".
 	return r.URL.Query().Get("jwt")
