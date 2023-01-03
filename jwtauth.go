@@ -47,9 +47,8 @@ func New(alg string, signKey interface{}, verifyKey interface{}) *JWTAuth {
 // Verifier http middleware handler will verify a JWT string from a http request.
 //
 // Verifier will search for a JWT token in a http request, in the order:
-//  1. 'jwt' URI query parameter
-//  2. 'Authorization: BEARER T' request header
-//  3. Cookie 'jwt' value
+//  1. 'Authorization: BEARER T' request header
+//  2. Cookie 'jwt' value
 //
 // The first JWT string that is found as a query parameter, authorization header
 // or cookie header is then decoded by the `jwt-go` library and a *jwt.Token
