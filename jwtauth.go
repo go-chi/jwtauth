@@ -12,15 +12,22 @@ import (
 )
 
 type JWTAuth struct {
-	alg       jwa.SignatureAlgorithm
-	signKey   interface{} // private-key
-	verifyKey interface{} // public-key, only used by RSA and ECDSA algorithms
-	verifier  jwt.ParseOption
+	alg             jwa.SignatureAlgorithm
+	signKey         interface{} // private-key
+	verifyKey       interface{} // public-key, only used by RSA and ECDSA algorithms
+	verifier        jwt.ParseOption
+	validateOptions []jwt.ValidateOption
+}
+
+func (j *JWTAuth) WithValidateOptions(validateOption jwt.ValidateOption) error {
+	j.validateOptions = append(j.validateOptions, validateOption)
+	return nil
 }
 
 var (
-	TokenCtxKey = &contextKey{"Token"}
-	ErrorCtxKey = &contextKey{"Error"}
+	TokenCtxKey          = &contextKey{"Token"}
+	ErrorCtxKey          = &contextKey{"Error"}
+	ValidateOptionCtxKey = &contextKey{"ValidateOption"}
 )
 
 var (
@@ -60,7 +67,9 @@ func New(alg string, signKey interface{}, verifyKey interface{}) *JWTAuth {
 // which checks the request context jwt token and error to prepare a custom
 // http response.
 func Verifier(ja *JWTAuth) func(http.Handler) http.Handler {
-	return Verify(ja, TokenFromHeader, TokenFromCookie)
+	return func(next http.Handler) http.Handler {
+		return Verify(ja, TokenFromHeader, TokenFromCookie)(next)
+	}
 }
 
 func Verify(ja *JWTAuth, findTokenFns ...func(r *http.Request) string) func(http.Handler) http.Handler {
@@ -68,7 +77,7 @@ func Verify(ja *JWTAuth, findTokenFns ...func(r *http.Request) string) func(http
 		hfn := func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
 			token, err := VerifyRequest(ja, r, findTokenFns...)
-			ctx = NewContext(ctx, token, err)
+			ctx = NewContext(ctx, token, err, ja.validateOptions)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		}
 		return http.HandlerFunc(hfn)
@@ -105,7 +114,7 @@ func VerifyToken(ja *JWTAuth, tokenString string) (jwt.Token, error) {
 		return nil, ErrUnauthorized
 	}
 
-	if err := jwt.Validate(token); err != nil {
+	if err := jwt.Validate(token, ja.validateOptions...); err != nil {
 		return token, ErrorReason(err)
 	}
 
@@ -161,14 +170,19 @@ func ErrorReason(err error) error {
 func Authenticator(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token, _, err := FromContext(r.Context())
-
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusUnauthorized)
+			http.Error(w, err.Error(), 401)
 			return
 		}
 
-		if token == nil || jwt.Validate(token) != nil {
-			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		validateOptions := GetOptions(r.Context())
+		if err != nil {
+			http.Error(w, err.Error(), 401)
+			return
+		}
+
+		if token == nil || jwt.Validate(token, validateOptions...) != nil {
+			http.Error(w, http.StatusText(401), 401)
 			return
 		}
 
@@ -177,9 +191,15 @@ func Authenticator(next http.Handler) http.Handler {
 	})
 }
 
-func NewContext(ctx context.Context, t jwt.Token, err error) context.Context {
+func GetOptions(ctx context.Context) []jwt.ValidateOption {
+	options, _ := ctx.Value(ValidateOptionCtxKey).([]jwt.ValidateOption)
+	return options
+}
+
+func NewContext(ctx context.Context, t jwt.Token, err error, validateOptions []jwt.ValidateOption) context.Context {
 	ctx = context.WithValue(ctx, TokenCtxKey, t)
 	ctx = context.WithValue(ctx, ErrorCtxKey, err)
+	ctx = context.WithValue(ctx, ValidateOptionCtxKey, validateOptions)
 	return ctx
 }
 
