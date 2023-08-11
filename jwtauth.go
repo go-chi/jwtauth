@@ -54,15 +54,15 @@ func New(alg string, signKey interface{}, verifyKey interface{}, validateOptions
 	return ja
 }
 
-func NewKeySet(set []byte) (*JWTAuth, error) {
-	keySet := jwk.NewSet()
-	err := json.Unmarshal(set, &keySet)
+func NewKeySet(keySet []byte) (*JWTAuth, error) {
+	ks := jwk.NewSet()
+	err := json.Unmarshal(keySet, &ks)
 	if err != nil {
 		return nil, err
 	}
 
-	ja := &JWTAuth{keySet: keySet}
-	ja.verifier = jwt.WithKeySet(keySet)
+	ja := &JWTAuth{keySet: ks}
+	ja.verifier = jwt.WithKeySet(ks)
 
 	return ja, nil
 }
