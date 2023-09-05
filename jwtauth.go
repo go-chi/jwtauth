@@ -238,6 +238,11 @@ func SetExpiryIn(claims map[string]interface{}, tm time.Duration) {
 	claims["exp"] = ExpireIn(tm)
 }
 
+// Set subject ("sub") in the claims
+func setSub(claims map[string]interface{}, sub string) {
+	claims["sub"] = sub
+}
+
 // TokenFromCookie tries to retreive the token string from a cookie named
 // "jwt".
 func TokenFromCookie(r *http.Request) string {
