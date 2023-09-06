@@ -243,6 +243,26 @@ func setSub(claims map[string]interface{}, sub string) {
 	claims["sub"] = sub
 }
 
+// Set audience ("aud") in the claims
+func setAudience(claims map[string]interface{}, aud string) {
+	claims["aud"] = aud
+}
+
+// Set JWT ID ("jti") in the claims
+func setJwtId(claims map[string]interface{}, jti string) {
+	claims["jti"] = jti
+}
+
+// Set not Before ("nbf") in the claims
+func setNotBefore(claims map[string]interface{}, nbf time.Time) {
+	claims["nbf"] = nbf.UTC().Unix()
+}
+
+// Add custom additional claim in the claims (For private/public claims, RFC 7519)
+func setXClaim(claims map[string]interface{}, claimName string, claimValue interface{}) {
+	claims[claimName] = claimValue
+}
+
 // TokenFromCookie tries to retreive the token string from a cookie named
 // "jwt".
 func TokenFromCookie(r *http.Request) string {
