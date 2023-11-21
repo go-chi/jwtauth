@@ -44,7 +44,7 @@ DLxxa5/7QyH6y77nCRQyJ3x3UwF9rUD0RCsp4sNdX5kOQ9PUyHyOtCUCAwEAAQ==
 )
 
 func init() {
-	TokenAuthHS256 = jwtauth.New(jwa.HS256.String(), TokenSecret, nil)
+	TokenAuthHS256 = jwtauth.New(jwa.HS256.String(), TokenSecret, nil, jwt.WithAcceptableSkew(30*time.Second))
 }
 
 //
@@ -101,7 +101,10 @@ func TestSimpleRSA(t *testing.T) {
 func TestSimple(t *testing.T) {
 	r := chi.NewRouter()
 
-	r.Use(jwtauth.Verifier(TokenAuthHS256), jwtauth.Authenticator)
+	r.Use(
+		jwtauth.Verifier(TokenAuthHS256),
+		jwtauth.Authenticator(TokenAuthHS256),
+	)
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("welcome"))
@@ -132,6 +135,19 @@ func TestSimple(t *testing.T) {
 	// correct token secret but wrong alg
 	h.Set("Authorization", "BEARER "+newJwt512Token(TokenSecret, map[string]interface{}{}))
 	if status, resp := testRequest(t, ts, "GET", "/", h, nil); status != 401 || resp != "token is unauthorized\n" {
+		t.Fatalf(resp)
+	}
+
+	// correct token, but has expired within the skew time
+	h.Set("Authorization", "BEARER "+newJwtToken(TokenSecret, map[string]interface{}{"exp": time.Now().Unix() - 29}))
+	if status, resp := testRequest(t, ts, "GET", "/", h, nil); status != 200 || resp != "welcome" {
+		fmt.Println("status", status, "resp", resp)
+		t.Fatalf(resp)
+	}
+
+	// correct token, but has expired outside of the skew time
+	h.Set("Authorization", "BEARER "+newJwtToken(TokenSecret, map[string]interface{}{"exp": time.Now().Unix() - 31}))
+	if status, resp := testRequest(t, ts, "GET", "/", h, nil); status != 401 || resp != "token is expired\n" {
 		t.Fatalf(resp)
 	}
 
@@ -269,6 +285,7 @@ func newJwtToken(secret []byte, claims ...map[string]interface{}) string {
 			token.Set(k, v)
 		}
 	}
+
 	tokenPayload, err := jwt.Sign(token, jwt.WithKey(jwa.HS256, secret))
 	if err != nil {
 		log.Fatal(err)
