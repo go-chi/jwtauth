@@ -136,6 +136,10 @@ func (ja *JWTAuth) Decode(tokenString string) (jwt.Token, error) {
 	return ja.parse([]byte(tokenString))
 }
 
+func (ja *JWTAuth) ValidateOptions() []jwt.ValidateOption {
+	return ja.validateOptions
+}
+
 func (ja *JWTAuth) sign(token jwt.Token) ([]byte, error) {
 	return jwt.Sign(token, jwt.WithKey(ja.alg, ja.signKey))
 }
