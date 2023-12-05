@@ -103,6 +103,17 @@ func router() http.Handler {
 }
 ```
 
+# Util
+
+See https://github.com/goware/jwtutil for utility to help you generate JWT tokens.
+
+`go install github.com/goware/jwtutil`
+
+Usage: `jwtutil -secret=secret -encode -claims='{"user_id":111}'`
+
+Output: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoxMTF9._cLJn0xFS0Mdr_4L_8XF8-8tv7bHyOQJXyWaNsSqlEs`
+
+
 # LICENSE
 
 [MIT](/LICENSE)
