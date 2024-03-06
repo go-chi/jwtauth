@@ -13,7 +13,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jws"
 
 	"github.com/go-chi/chi/v5"
@@ -364,7 +363,6 @@ func TestKeySet(t *testing.T) {
 	r := chi.NewRouter()
 
 	keySetBytes := []byte(KeySet)
-	// keySetPtr := &keySetBytes
 	keySet, err := jwtauth.NewKeySet(keySetBytes)
 	if err != nil {
 		t.Fatalf(err.Error())
