@@ -90,10 +90,6 @@ func Verify(ja *JWTAuth, findTokenFns ...func(r *http.Request) string) func(http
 	return func(next http.Handler) http.Handler {
 		hfn := func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
-			if ja.keySet != nil {
-				ctx = NewContext(ctx, nil, nil)
-				next.ServeHTTP(w, r.WithContext(ctx))
-			}
 			token, err := VerifyRequest(ja, r, findTokenFns...)
 			ctx = NewContext(ctx, token, err)
 			next.ServeHTTP(w, r.WithContext(ctx))

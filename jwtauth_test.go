@@ -362,8 +362,7 @@ func TestKeySet(t *testing.T) {
 
 	r := chi.NewRouter()
 
-	keySetBytes := []byte(KeySet)
-	keySet, err := jwtauth.NewKeySet(keySetBytes)
+	keySet, err := jwtauth.NewKeySet([]byte(KeySet))
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
