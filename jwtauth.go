@@ -86,45 +86,12 @@ func Verifier(ja *JWTAuth) func(http.Handler) http.Handler {
 	return Verify(ja, TokenFromHeader, TokenFromCookie)
 }
 
-// VerifierDynamic http middleware handler will verify a JWT string from a http request.
-//
-// Verifier will search for a JWT token in a http request, in the order:
-//   1. 'jwt' URI query parameter
-//   2. 'Authorization: BEARER T' request header
-//   3. Cookie 'jwt' value
-//
-// The first JWT string that is found as a query parameter, authorization header
-// or cookie header is then decoded by the `jwt-go` library and a *jwt.Token
-// object is set on the request context. In the case of a signature decoding error
-// the Verifier will also set the error on the request context.
-//
-// The Verifier always calls the next http handler in sequence, which can either
-// be the generic `jwtauth.Authenticator` middleware or your own custom handler
-// which checks the request context jwt token and error to prepare a custom
-// http response.
-func VerifierDynamic(jaf func() (*JWTAuth, error)) func(http.Handler) http.Handler {
-	return VerifyDynamic(jaf, TokenFromHeader, TokenFromCookie)
-}
-
 func Verify(ja *JWTAuth, findTokenFns ...func(r *http.Request) string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		hfn := func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
-			token, err := VerifyRequest(ja, r, findTokenFns...)
-			ctx = NewContext(ctx, token, err)
-			next.ServeHTTP(w, r.WithContext(ctx))
-		}
-		return http.HandlerFunc(hfn)
-	}
-}
-
-func VerifyDynamic(jaf func() (*JWTAuth, error), findTokenFns ...func(r *http.Request) string) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		hfn := func(w http.ResponseWriter, r *http.Request) {
-			ctx := r.Context()
-			ja, err := jaf()
-			if err != nil {
-				ctx = NewContext(ctx, nil, err)
+			if ja.keySet != nil {
+				ctx = NewContext(ctx, nil, nil)
 				next.ServeHTTP(w, r.WithContext(ctx))
 			}
 			token, err := VerifyRequest(ja, r, findTokenFns...)
