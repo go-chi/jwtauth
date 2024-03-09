@@ -118,5 +118,5 @@ Output: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoxMTF9._cLJn0xFS0Mdr
 
 [MIT](/LICENSE)
 
-[godoc]: https://godoc.org/github.com/go-chi/jwtauth
+[godoc]: https://pkg.go.dev/github.com/go-chi/jwtauth/v5
 [godoc widget]: https://godoc.org/github.com/go-chi/jwtauth?status.svg
