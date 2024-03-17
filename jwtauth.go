@@ -251,10 +251,25 @@ func SetExpiryIn(claims map[string]interface{}, tm time.Duration) {
 	claims["exp"] = ExpireIn(tm)
 }
 
+const defaultCookieName = "jwt"
+
+// TokenFromCookieWith tries to retreive the token string from a cookie with the
+// specified name.
+func TokenFromCookieWith(name string) func(r *http.Request) string {
+	return func(r *http.Request) string {
+		return getTokenFromCookie(r, name)
+	}
+}
+
 // TokenFromCookie tries to retreive the token string from a cookie named
 // "jwt".
 func TokenFromCookie(r *http.Request) string {
-	cookie, err := r.Cookie("jwt")
+	return getTokenFromCookie(r, defaultCookieName)
+}
+
+// get token from cookie
+func getTokenFromCookie(r *http.Request, name string) string {
+	cookie, err := r.Cookie(name)
 	if err != nil {
 		return ""
 	}
@@ -272,6 +287,8 @@ func TokenFromHeader(r *http.Request) string {
 	return ""
 }
 
+const defaultQueryParam = "jwt"
+
 // TokenFromQuery tries to retreive the token string from the "jwt" URI
 // query parameter.
 //
@@ -284,7 +301,28 @@ func TokenFromHeader(r *http.Request) string {
 //	}
 func TokenFromQuery(r *http.Request) string {
 	// Get token from query param named "jwt".
-	return r.URL.Query().Get("jwt")
+	return getTokenFromQuery(r, defaultQueryParam)
+}
+
+// TokenFromQueryWith tries to retreive the token string from the specified
+// URI query parameter.
+//
+// To use it, build our own middleware handler, such as:
+//
+//	func Verifier(ja *JWTAuth) func(http.Handler) http.Handler {
+//		return func(next http.Handler) http.Handler {
+//			return Verify(ja, TokenFromQueryWith("token"), TokenFromHeader, TokenFromCookie)(next)
+//		}
+//	}
+func TokenFromQueryWith(param string) func(r *http.Request) string {
+	return func(r *http.Request) string {
+		return getTokenFromQuery(r, param)
+	}
+}
+
+// get token from query param
+func getTokenFromQuery(r *http.Request, param string) string {
+	return r.URL.Query().Get(param)
 }
 
 // contextKey is a value for use with context.WithValue. It's used as
