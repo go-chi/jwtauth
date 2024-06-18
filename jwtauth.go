@@ -122,7 +122,9 @@ func VerifyToken(ja *JWTAuth, tokenString string) (jwt.Token, error) {
 func (ja *JWTAuth) Encode(claims map[string]interface{}) (t jwt.Token, tokenString string, err error) {
 	t = jwt.New()
 	for k, v := range claims {
-		t.Set(k, v)
+		if err := t.Set(k, v); err != nil {
+			return nil, "", err
+		}
 	}
 	payload, err := ja.sign(t)
 	if err != nil {

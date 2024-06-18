@@ -279,6 +279,23 @@ func TestMore(t *testing.T) {
 	}
 }
 
+func TestEncodeClaims(t *testing.T) {
+	claims := map[string]interface{}{
+		"key1": "val1",
+		"key2": 2,
+		"key3": time.Now(),
+		"key4": []string{"1", "2"},
+	}
+	claims[jwt.JwtIDKey] = 1
+	if _, _, err := TokenAuthHS256.Encode(claims); err == nil {
+		t.Fatal("encoding invalid claims succeeded")
+	}
+	claims[jwt.JwtIDKey] = "123"
+	if _, _, err := TokenAuthHS256.Encode(claims); err != nil {
+		t.Fatalf("unexpected error encoding valid claims: %v", err)
+	}
+}
+
 //
 // Test helper functions
 //
