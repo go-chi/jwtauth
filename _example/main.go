@@ -61,15 +61,17 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/jwtauth/v5"
+	"github.com/lestrrat-go/jwx/v2/jwt"
 )
 
 var tokenAuth *jwtauth.JWTAuth
 
 func init() {
-	tokenAuth = jwtauth.New("HS256", []byte("secret"), nil)
+	tokenAuth = jwtauth.New("HS256", []byte("secret"), nil, jwt.WithAcceptableSkew(30*time.Second))
 
 	// For debugging/example purposes, we generate and print
 	// a sample jwt token with claims `user_id:123` here:
@@ -95,7 +97,7 @@ func router() http.Handler {
 		// the provided authenticator middleware, but you can write your
 		// own very easily, look at the Authenticator method in jwtauth.go
 		// and tweak it, its not scary.
-		r.Use(jwtauth.Authenticator)
+		r.Use(jwtauth.Authenticator(tokenAuth))
 
 		r.Get("/admin", func(w http.ResponseWriter, r *http.Request) {
 			_, claims, _ := jwtauth.FromContext(r.Context())

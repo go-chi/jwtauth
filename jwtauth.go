@@ -12,10 +12,11 @@ import (
 )
 
 type JWTAuth struct {
-	alg       jwa.SignatureAlgorithm
-	signKey   interface{} // private-key
-	verifyKey interface{} // public-key, only used by RSA and ECDSA algorithms
-	verifier  jwt.ParseOption
+	alg             jwa.SignatureAlgorithm
+	signKey         interface{} // private-key
+	verifyKey       interface{} // public-key, only used by RSA and ECDSA algorithms
+	verifier        jwt.ParseOption
+	validateOptions []jwt.ValidateOption
 }
 
 var (
@@ -32,8 +33,13 @@ var (
 	ErrAlgoInvalid  = errors.New("algorithm mismatch")
 )
 
-func New(alg string, signKey interface{}, verifyKey interface{}) *JWTAuth {
-	ja := &JWTAuth{alg: jwa.SignatureAlgorithm(alg), signKey: signKey, verifyKey: verifyKey}
+func New(alg string, signKey interface{}, verifyKey interface{}, validateOptions ...jwt.ValidateOption) *JWTAuth {
+	ja := &JWTAuth{
+		alg:             jwa.SignatureAlgorithm(alg),
+		signKey:         signKey,
+		verifyKey:       verifyKey,
+		validateOptions: validateOptions,
+	}
 
 	if ja.verifyKey != nil {
 		ja.verifier = jwt.WithKey(ja.alg, ja.verifyKey)
@@ -105,7 +111,7 @@ func VerifyToken(ja *JWTAuth, tokenString string) (jwt.Token, error) {
 		return nil, ErrUnauthorized
 	}
 
-	if err := jwt.Validate(token); err != nil {
+	if err := jwt.Validate(token, ja.validateOptions...); err != nil {
 		return token, ErrorReason(err)
 	}
 
@@ -116,7 +122,9 @@ func VerifyToken(ja *JWTAuth, tokenString string) (jwt.Token, error) {
 func (ja *JWTAuth) Encode(claims map[string]interface{}) (t jwt.Token, tokenString string, err error) {
 	t = jwt.New()
 	for k, v := range claims {
-		t.Set(k, v)
+		if err := t.Set(k, v); err != nil {
+			return nil, "", err
+		}
 	}
 	payload, err := ja.sign(t)
 	if err != nil {
@@ -128,6 +136,10 @@ func (ja *JWTAuth) Encode(claims map[string]interface{}) (t jwt.Token, tokenStri
 
 func (ja *JWTAuth) Decode(tokenString string) (jwt.Token, error) {
 	return ja.parse([]byte(tokenString))
+}
+
+func (ja *JWTAuth) ValidateOptions() []jwt.ValidateOption {
+	return ja.validateOptions
 }
 
 func (ja *JWTAuth) Sign(token jwt.Token) ([]byte, error) {
@@ -158,23 +170,26 @@ func ErrorReason(err error) error {
 // Verifier middleware request context values. The Authenticator sends a 401 Unauthorized
 // response for any unverified tokens and passes the good ones through. It's just fine
 // until you decide to write something similar and customize your client response.
-func Authenticator(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		token, _, err := FromContext(r.Context())
+func Authenticator(ja *JWTAuth) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		hfn := func(w http.ResponseWriter, r *http.Request) {
+			token, _, err := FromContext(r.Context())
 
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusUnauthorized)
-			return
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusUnauthorized)
+				return
+			}
+
+			if token == nil || jwt.Validate(token, ja.validateOptions...) != nil {
+				http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+				return
+			}
+
+			// Token is authenticated, pass it through
+			next.ServeHTTP(w, r)
 		}
-
-		if token == nil || jwt.Validate(token) != nil {
-			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
-			return
-		}
-
-		// Token is authenticated, pass it through
-		next.ServeHTTP(w, r)
-	})
+		return http.HandlerFunc(hfn)
+	}
 }
 
 func NewContext(ctx context.Context, t jwt.Token, err error) context.Context {

@@ -84,7 +84,7 @@ func router() http.Handler {
 		// the provided authenticator middleware, but you can write your
 		// own very easily, look at the Authenticator method in jwtauth.go
 		// and tweak it, its not scary.
-		r.Use(jwtauth.Authenticator)
+		r.Use(jwtauth.Authenticator(tokenAuth))
 
 		r.Get("/admin", func(w http.ResponseWriter, r *http.Request) {
 			_, claims, _ := jwtauth.FromContext(r.Context())
@@ -103,9 +103,20 @@ func router() http.Handler {
 }
 ```
 
+# Util
+
+See https://github.com/goware/jwtutil for utility to help you generate JWT tokens.
+
+`go install github.com/goware/jwtutil`
+
+Usage: `jwtutil -secret=secret -encode -claims='{"user_id":111}'`
+
+Output: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoxMTF9._cLJn0xFS0Mdr_4L_8XF8-8tv7bHyOQJXyWaNsSqlEs`
+
+
 # LICENSE
 
 [MIT](/LICENSE)
 
-[godoc]: https://godoc.org/github.com/go-chi/jwtauth
+[godoc]: https://pkg.go.dev/github.com/go-chi/jwtauth/v5
 [godoc widget]: https://godoc.org/github.com/go-chi/jwtauth?status.svg

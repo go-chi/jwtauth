@@ -44,64 +44,20 @@ DLxxa5/7QyH6y77nCRQyJ3x3UwF9rUD0RCsp4sNdX5kOQ9PUyHyOtCUCAwEAAQ==
 )
 
 func init() {
-	TokenAuthHS256 = jwtauth.New(jwa.HS256.String(), TokenSecret, nil)
+	TokenAuthHS256 = jwtauth.New(jwa.HS256.String(), TokenSecret, nil, jwt.WithAcceptableSkew(30*time.Second))
 }
 
 //
 // Tests
 //
 
-func TestSimpleRSA(t *testing.T) {
-	privateKeyBlock, _ := pem.Decode([]byte(PrivateKeyRS256String))
-
-	privateKey, err := x509.ParsePKCS1PrivateKey(privateKeyBlock.Bytes)
-
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-
-	publicKeyBlock, _ := pem.Decode([]byte(PublicKeyRS256String))
-
-	publicKey, err := x509.ParsePKIXPublicKey(publicKeyBlock.Bytes)
-
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-
-	TokenAuthRS256 = jwtauth.New(jwa.RS256.String(), privateKey, publicKey)
-
-	claims := map[string]interface{}{
-		"key":  "val",
-		"key2": "val2",
-		"key3": "val3",
-	}
-
-	_, tokenString, err := TokenAuthRS256.Encode(claims)
-
-	if err != nil {
-		t.Fatalf("Failed to encode claims %s\n", err.Error())
-	}
-
-	token, err := TokenAuthRS256.Decode(tokenString)
-
-	if err != nil {
-		t.Fatalf("Failed to decode token string %s\n", err.Error())
-	}
-
-	tokenClaims, err := token.AsMap(context.Background())
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-
-	if !reflect.DeepEqual(claims, tokenClaims) {
-		t.Fatalf("The decoded claims don't match the original ones\n")
-	}
-}
-
 func TestSimple(t *testing.T) {
 	r := chi.NewRouter()
 
-	r.Use(jwtauth.Verifier(TokenAuthHS256), jwtauth.Authenticator)
+	r.Use(
+		jwtauth.Verifier(TokenAuthHS256),
+		jwtauth.Authenticator(TokenAuthHS256),
+	)
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("welcome"))
@@ -135,9 +91,101 @@ func TestSimple(t *testing.T) {
 		t.Fatalf(resp)
 	}
 
+	// correct token, but has expired within the skew time
+	h.Set("Authorization", "BEARER "+newJwtToken(TokenSecret, map[string]interface{}{"exp": time.Now().Unix() - 29}))
+	if status, resp := testRequest(t, ts, "GET", "/", h, nil); status != 200 || resp != "welcome" {
+		fmt.Println("status", status, "resp", resp)
+		t.Fatalf(resp)
+	}
+
+	// correct token, but has expired outside of the skew time
+	h.Set("Authorization", "BEARER "+newJwtToken(TokenSecret, map[string]interface{}{"exp": time.Now().Unix() - 31}))
+	if status, resp := testRequest(t, ts, "GET", "/", h, nil); status != 401 || resp != "token is expired\n" {
+		t.Fatalf(resp)
+	}
+
 	// sending authorized requests
 	if status, resp := testRequest(t, ts, "GET", "/", newAuthHeader(), nil); status != 200 || resp != "welcome" {
 		t.Fatalf(resp)
+	}
+}
+
+func TestSimpleRSA(t *testing.T) {
+	privateKeyBlock, _ := pem.Decode([]byte(PrivateKeyRS256String))
+
+	privateKey, err := x509.ParsePKCS1PrivateKey(privateKeyBlock.Bytes)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+
+	publicKeyBlock, _ := pem.Decode([]byte(PublicKeyRS256String))
+
+	publicKey, err := x509.ParsePKIXPublicKey(publicKeyBlock.Bytes)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+
+	TokenAuthRS256 = jwtauth.New(jwa.RS256.String(), privateKey, publicKey)
+
+	claims := map[string]interface{}{
+		"key":  "val",
+		"key2": "val2",
+		"key3": "val3",
+	}
+
+	_, tokenString, err := TokenAuthRS256.Encode(claims)
+	if err != nil {
+		t.Fatalf("Failed to encode claims %s\n", err.Error())
+	}
+
+	token, err := TokenAuthRS256.Decode(tokenString)
+	if err != nil {
+		t.Fatalf("Failed to decode token string %s\n", err.Error())
+	}
+
+	tokenClaims, err := token.AsMap(context.Background())
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+
+	if !reflect.DeepEqual(claims, tokenClaims) {
+		t.Fatalf("The decoded claims don't match the original ones\n")
+	}
+}
+
+func TestSimpleRSAVerifyOnly(t *testing.T) {
+	tokenString := "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkiOiJ2YWwiLCJrZXkyIjoidmFsMiIsImtleTMiOiJ2YWwzIn0.kLEK3FZZPsAlQNKR5yHyjRyrlCJFhvKmrh7o-GqDT_zaGQgvb0Dufp8uNSMeOFAlLGK5FbKX7BckjJqfvEyrTQ"
+	claims := map[string]interface{}{
+		"key":  "val",
+		"key2": "val2",
+		"key3": "val3",
+	}
+
+	publicKeyBlock, _ := pem.Decode([]byte(PublicKeyRS256String))
+	publicKey, err := x509.ParsePKIXPublicKey(publicKeyBlock.Bytes)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+
+	TokenAuthRS256 = jwtauth.New(jwa.RS256.String(), nil, publicKey)
+
+	_, _, err = TokenAuthRS256.Encode(claims)
+	if err == nil {
+		t.Fatalf("Expecting error when encoding claims without signing key")
+	}
+
+	token, err := TokenAuthRS256.Decode(tokenString)
+	if err != nil {
+		t.Fatalf("Failed to decode token string %s\n", err.Error())
+	}
+
+	tokenClaims, err := token.AsMap(context.Background())
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+
+	if !reflect.DeepEqual(claims, tokenClaims) {
+		t.Fatalf("The decoded claims don't match the original ones\n")
 	}
 }
 
@@ -231,6 +279,23 @@ func TestMore(t *testing.T) {
 	}
 }
 
+func TestEncodeClaims(t *testing.T) {
+	claims := map[string]interface{}{
+		"key1": "val1",
+		"key2": 2,
+		"key3": time.Now(),
+		"key4": []string{"1", "2"},
+	}
+	claims[jwt.JwtIDKey] = 1
+	if _, _, err := TokenAuthHS256.Encode(claims); err == nil {
+		t.Fatal("encoding invalid claims succeeded")
+	}
+	claims[jwt.JwtIDKey] = "123"
+	if _, _, err := TokenAuthHS256.Encode(claims); err != nil {
+		t.Fatalf("unexpected error encoding valid claims: %v", err)
+	}
+}
+
 //
 // Test helper functions
 //
@@ -269,6 +334,7 @@ func newJwtToken(secret []byte, claims ...map[string]interface{}) string {
 			token.Set(k, v)
 		}
 	}
+
 	tokenPayload, err := jwt.Sign(token, jwt.WithKey(jwa.HS256, secret))
 	if err != nil {
 		log.Fatal(err)
