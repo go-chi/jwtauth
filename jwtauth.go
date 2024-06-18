@@ -130,11 +130,11 @@ func (ja *JWTAuth) Decode(tokenString string) (jwt.Token, error) {
 	return ja.parse([]byte(tokenString))
 }
 
-func (ja *JWTAuth) sign(token jwt.Token) ([]byte, error) {
+func (ja *JWTAuth) Sign(token jwt.Token) ([]byte, error) {
 	return jwt.Sign(token, jwt.WithKey(ja.alg, ja.signKey))
 }
 
-func (ja *JWTAuth) parse(payload []byte) (jwt.Token, error) {
+func (ja *JWTAuth) Parse(payload []byte) (jwt.Token, error) {
 	// we disable validation here because we use jwt.Validate to validate tokens
 	return jwt.Parse(payload, ja.verifier, jwt.WithValidate(false))
 }
@@ -239,27 +239,27 @@ func SetExpiryIn(claims map[string]interface{}, tm time.Duration) {
 }
 
 // Set subject ("sub") in the claims
-func setSub(claims map[string]interface{}, sub string) {
+func SetSub(claims map[string]interface{}, sub string) {
 	claims["sub"] = sub
 }
 
 // Set audience ("aud") in the claims
-func setAudience(claims map[string]interface{}, aud string) {
+func SetAudience(claims map[string]interface{}, aud string) {
 	claims["aud"] = aud
 }
 
 // Set JWT ID ("jti") in the claims
-func setJwtId(claims map[string]interface{}, jti string) {
+func SetJwtId(claims map[string]interface{}, jti string) {
 	claims["jti"] = jti
 }
 
 // Set not Before ("nbf") in the claims
-func setNotBefore(claims map[string]interface{}, nbf time.Time) {
+func SetNotBefore(claims map[string]interface{}, nbf time.Time) {
 	claims["nbf"] = nbf.UTC().Unix()
 }
 
 // Add custom additional claim in the claims (For private/public claims, RFC 7519)
-func setXClaim(claims map[string]interface{}, claimName string, claimValue interface{}) {
+func SetXclaim(claims map[string]interface{}, claimName string, claimValue interface{}) {
 	claims[claimName] = claimValue
 }
 
@@ -302,7 +302,7 @@ func TokenFromQuery(r *http.Request) string {
 // contextKey is a value for use with context.WithValue. It's used as
 // a pointer so it fits in an interface{} without allocation. This technique
 // for defining context keys was copied from Go 1.7's new use of context in net/http.
-type contextKey struct {
+type ContextKey struct {
 	name string
 }
 
