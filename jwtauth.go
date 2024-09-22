@@ -33,6 +33,8 @@ var (
 	ErrAlgoInvalid  = errors.New("algorithm mismatch")
 )
 
+const defaultTokenKeyName = "jwt"
+
 func New(alg string, signKey interface{}, verifyKey interface{}, validateOptions ...jwt.ValidateOption) *JWTAuth {
 	ja := &JWTAuth{
 		alg:             jwa.SignatureAlgorithm(alg),
@@ -251,8 +253,6 @@ func SetExpiryIn(claims map[string]interface{}, tm time.Duration) {
 	claims["exp"] = ExpireIn(tm)
 }
 
-const defaultCookieName = "jwt"
-
 // TokenFromCookieByName tries to retreive the token string from the specified cookie name.
 func TokenFromCookieByName(name string) func(r *http.Request) string {
 	return func(r *http.Request) string {
@@ -263,7 +263,7 @@ func TokenFromCookieByName(name string) func(r *http.Request) string {
 // TokenFromCookie tries to retreive the token string from a cookie named
 // "jwt".
 func TokenFromCookie(r *http.Request) string {
-	return getTokenFromCookie(r, defaultCookieName)
+	return getTokenFromCookie(r, defaultTokenKeyName)
 }
 
 // get token from cookie
@@ -286,8 +286,6 @@ func TokenFromHeader(r *http.Request) string {
 	return ""
 }
 
-const defaultQueryParam = "jwt"
-
 // TokenFromQuery tries to retreive the token string from the "jwt" URI
 // query parameter.
 //
@@ -300,7 +298,7 @@ const defaultQueryParam = "jwt"
 //	}
 func TokenFromQuery(r *http.Request) string {
 	// Get token from query param named "jwt".
-	return getTokenFromQuery(r, defaultQueryParam)
+	return getTokenFromQuery(r, defaultTokenKeyName)
 }
 
 // TokenFromQueryByName tries to retreive the token string from the specified
