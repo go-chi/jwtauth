@@ -253,9 +253,8 @@ func SetExpiryIn(claims map[string]interface{}, tm time.Duration) {
 
 const defaultCookieName = "jwt"
 
-// TokenFromCookieWith tries to retreive the token string from a cookie with the
-// specified name.
-func TokenFromCookieWith(name string) func(r *http.Request) string {
+// TokenFromCookieByName tries to retreive the token string from the specified cookie name.
+func TokenFromCookieByName(name string) func(r *http.Request) string {
 	return func(r *http.Request) string {
 		return getTokenFromCookie(r, name)
 	}
@@ -304,17 +303,17 @@ func TokenFromQuery(r *http.Request) string {
 	return getTokenFromQuery(r, defaultQueryParam)
 }
 
-// TokenFromQueryWith tries to retreive the token string from the specified
+// TokenFromQueryByName tries to retreive the token string from the specified
 // URI query parameter.
 //
 // To use it, build our own middleware handler, such as:
 //
 //	func Verifier(ja *JWTAuth) func(http.Handler) http.Handler {
 //		return func(next http.Handler) http.Handler {
-//			return Verify(ja, TokenFromQueryWith("token"), TokenFromHeader, TokenFromCookie)(next)
+//			return Verify(ja, TokenFromQueryByName("token"), TokenFromHeader, TokenFromCookie)(next)
 //		}
 //	}
-func TokenFromQueryWith(param string) func(r *http.Request) string {
+func TokenFromQueryByName(param string) func(r *http.Request) string {
 	return func(r *http.Request) string {
 		return getTokenFromQuery(r, param)
 	}
