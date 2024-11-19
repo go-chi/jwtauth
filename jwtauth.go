@@ -180,7 +180,7 @@ func Authenticator(ja *JWTAuth) func(http.Handler) http.Handler {
 				return
 			}
 
-			if token == nil || jwt.Validate(token, ja.validateOptions...) != nil {
+			if token == nil {
 				http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 				return
 			}
