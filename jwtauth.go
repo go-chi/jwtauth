@@ -2,12 +2,14 @@ package jwtauth
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/lestrrat-go/jwx/v2/jwa"
+	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/lestrrat-go/jwx/v2/jwt"
 )
 
@@ -17,6 +19,7 @@ type JWTAuth struct {
 	verifyKey       interface{} // public-key, only used by RSA and ECDSA algorithms
 	verifier        jwt.ParseOption
 	validateOptions []jwt.ValidateOption
+	keySet          jwk.Set
 }
 
 var (
@@ -48,6 +51,24 @@ func New(alg string, signKey interface{}, verifyKey interface{}, validateOptions
 	}
 
 	return ja
+}
+
+// NewKeySet initializes a new JWTAuth instance with the provided key set.
+// It takes a keySet parameter, which is a byte slice containing the key set in JSON format.
+// The function returns a pointer to JWTAuth and an error.
+// If the key set cannot be unmarshaled from the byte slice, an error is returned.
+// Otherwise, the JWTAuth instance is created with the unmarshaled key set and a verifier is set using the key set.
+func NewKeySet(keySet []byte) (*JWTAuth, error) {
+	ks := jwk.NewSet()
+	err := json.Unmarshal(keySet, &ks)
+	if err != nil {
+		return nil, err
+	}
+
+	ja := &JWTAuth{keySet: ks}
+	ja.verifier = jwt.WithKeySet(ks)
+
+	return ja, nil
 }
 
 // Verifier http middleware handler will verify a JWT string from a http request.
@@ -119,12 +140,20 @@ func VerifyToken(ja *JWTAuth, tokenString string) (jwt.Token, error) {
 	return token, nil
 }
 
+// Encode generates a JWT token string with the provided claims.
+// It returns the encoded token as a string, along with the token object and any error encountered.
 func (ja *JWTAuth) Encode(claims map[string]interface{}) (t jwt.Token, tokenString string, err error) {
 	t = jwt.New()
 	for k, v := range claims {
 		if err := t.Set(k, v); err != nil {
 			return nil, "", err
 		}
+	}
+	// ja.sign() isn't going to work if ja.signKey is nil
+	if ja.signKey == nil {
+		// This generally means that you've called Encode on a KeySet
+		// which can't be supported.
+		return nil, "", errors.New("no signing key provided")
 	}
 	payload, err := ja.sign(t)
 	if err != nil {
