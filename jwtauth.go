@@ -33,6 +33,8 @@ var (
 	ErrAlgoInvalid  = errors.New("algorithm mismatch")
 )
 
+const defaultTokenKeyName = "jwt"
+
 func New(alg string, signKey interface{}, verifyKey interface{}, validateOptions ...jwt.ValidateOption) *JWTAuth {
 	ja := &JWTAuth{
 		alg:             jwa.SignatureAlgorithm(alg),
@@ -253,10 +255,22 @@ func SetExpiryIn(claims map[string]interface{}, tm time.Duration) {
 	claims["exp"] = ExpireIn(tm)
 }
 
+// TokenFromCookieByName tries to retreive the token string from the specified cookie name.
+func TokenFromCookieByName(name string) func(r *http.Request) string {
+	return func(r *http.Request) string {
+		return getTokenFromCookie(r, name)
+	}
+}
+
 // TokenFromCookie tries to retreive the token string from a cookie named
 // "jwt".
 func TokenFromCookie(r *http.Request) string {
-	cookie, err := r.Cookie("jwt")
+	return getTokenFromCookie(r, defaultTokenKeyName)
+}
+
+// get token from cookie
+func getTokenFromCookie(r *http.Request, name string) string {
+	cookie, err := r.Cookie(name)
 	if err != nil {
 		return ""
 	}
@@ -286,7 +300,28 @@ func TokenFromHeader(r *http.Request) string {
 //	}
 func TokenFromQuery(r *http.Request) string {
 	// Get token from query param named "jwt".
-	return r.URL.Query().Get("jwt")
+	return getTokenFromQuery(r, defaultTokenKeyName)
+}
+
+// TokenFromQueryByName tries to retreive the token string from the specified
+// URI query parameter.
+//
+// To use it, build our own middleware handler, such as:
+//
+//	func Verifier(ja *JWTAuth) func(http.Handler) http.Handler {
+//		return func(next http.Handler) http.Handler {
+//			return Verify(ja, TokenFromQueryByName("token"), TokenFromHeader, TokenFromCookie)(next)
+//		}
+//	}
+func TokenFromQueryByName(param string) func(r *http.Request) string {
+	return func(r *http.Request) string {
+		return getTokenFromQuery(r, param)
+	}
+}
+
+// get token from query param
+func getTokenFromQuery(r *http.Request, param string) string {
+	return r.URL.Query().Get(param)
 }
 
 // contextKey is a value for use with context.WithValue. It's used as
