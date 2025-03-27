@@ -66,47 +66,35 @@ func TestSimple(t *testing.T) {
 	ts := httptest.NewServer(r)
 	defer ts.Close()
 
-	// sending unauthorized requests
-	if status, resp := testRequest(t, ts, "GET", "/", nil, nil); status != 401 || resp != "no token found\n" {
-		t.Fatalf(resp)
+	tt := []struct {
+		Name          string
+		Authorization string
+		Status        int
+		Resp          string
+	}{
+		{Name: "empty token", Authorization: "", Status: 401, Resp: "no token found\n"},
+		{Name: "wrong token", Authorization: "Bearer asdf", Status: 401, Resp: "token is unauthorized\n"},
+		{Name: "wrong secret", Authorization: "Bearer " + newJwtToken([]byte("wrong")), Status: 401, Resp: "token is unauthorized\n"},
+		{Name: "wrong secret/alg", Authorization: "Bearer " + newJwt512Token([]byte("wrong")), Status: 401, Resp: "token is unauthorized\n"},
+		{Name: "wrong alg", Authorization: "Bearer " + newJwt512Token(TokenSecret, map[string]interface{}{}), Status: 401, Resp: "token is unauthorized\n"},
+		{Name: "expired within skew", Authorization: "Bearer " + newJwtToken(TokenSecret, map[string]interface{}{"exp": time.Now().Unix() - 29}), Status: 200, Resp: "welcome"},
+		{Name: "expired outside skew", Authorization: "Bearer " + newJwtToken(TokenSecret, map[string]interface{}{"exp": time.Now().Unix() - 31}), Status: 401, Resp: "token is expired\n"},
+		{Name: "valid token", Authorization: "Bearer " + newJwtToken(TokenSecret), Status: 200, Resp: "welcome"},
+		{Name: "valid Bearer", Authorization: "Bearer " + newJwtToken(TokenSecret, map[string]interface{}{"service": "test"}), Status: 200, Resp: "welcome"},
+		{Name: "valid BEARER", Authorization: "BEARER " + newJwtToken(TokenSecret), Status: 200, Resp: "welcome"},
+		{Name: "valid bearer", Authorization: "bearer " + newJwtToken(TokenSecret), Status: 200, Resp: "welcome"},
+		{Name: "valid claim", Authorization: "Bearer " + newJwtToken(TokenSecret, map[string]interface{}{"service": "test"}), Status: 200, Resp: "welcome"},
 	}
 
-	h := http.Header{}
-	h.Set("Authorization", "BEARER "+newJwtToken([]byte("wrong"), map[string]interface{}{}))
-	if status, resp := testRequest(t, ts, "GET", "/", h, nil); status != 401 || resp != "token is unauthorized\n" {
-		t.Fatalf(resp)
-	}
-	h.Set("Authorization", "BEARER asdf")
-	if status, resp := testRequest(t, ts, "GET", "/", h, nil); status != 401 || resp != "token is unauthorized\n" {
-		t.Fatalf(resp)
-	}
-	// wrong token secret and wrong alg
-	h.Set("Authorization", "BEARER "+newJwt512Token([]byte("wrong"), map[string]interface{}{}))
-	if status, resp := testRequest(t, ts, "GET", "/", h, nil); status != 401 || resp != "token is unauthorized\n" {
-		t.Fatalf(resp)
-	}
-	// correct token secret but wrong alg
-	h.Set("Authorization", "BEARER "+newJwt512Token(TokenSecret, map[string]interface{}{}))
-	if status, resp := testRequest(t, ts, "GET", "/", h, nil); status != 401 || resp != "token is unauthorized\n" {
-		t.Fatalf(resp)
-	}
-
-	// correct token, but has expired within the skew time
-	h.Set("Authorization", "BEARER "+newJwtToken(TokenSecret, map[string]interface{}{"exp": time.Now().Unix() - 29}))
-	if status, resp := testRequest(t, ts, "GET", "/", h, nil); status != 200 || resp != "welcome" {
-		fmt.Println("status", status, "resp", resp)
-		t.Fatalf(resp)
-	}
-
-	// correct token, but has expired outside of the skew time
-	h.Set("Authorization", "BEARER "+newJwtToken(TokenSecret, map[string]interface{}{"exp": time.Now().Unix() - 31}))
-	if status, resp := testRequest(t, ts, "GET", "/", h, nil); status != 401 || resp != "token is expired\n" {
-		t.Fatalf(resp)
-	}
-
-	// sending authorized requests
-	if status, resp := testRequest(t, ts, "GET", "/", newAuthHeader(), nil); status != 200 || resp != "welcome" {
-		t.Fatalf(resp)
+	for _, tc := range tt {
+		h := http.Header{}
+		if tc.Authorization != "" {
+			h.Set("Authorization", tc.Authorization)
+		}
+		status, resp := testRequest(t, ts, "GET", "/", h, nil)
+		if status != tc.Status || resp != tc.Resp {
+			t.Fatalf("test '%s' failed: expected status %d, got %d", tc.Name, tc.Status, status)
+		}
 	}
 }
 
