@@ -84,8 +84,8 @@ func TestSimple(t *testing.T) {
 		{Name: "valid BEARER", Authorization: "BEARER " + newJwtToken(TokenSecret), Status: 200, Resp: "welcome"},
 		{Name: "valid bearer", Authorization: "bearer " + newJwtToken(TokenSecret), Status: 200, Resp: "welcome"},
 		{Name: "valid claim", Authorization: "Bearer " + newJwtToken(TokenSecret, map[string]interface{}{"service": "test"}), Status: 200, Resp: "welcome"},
-		{Name: "invalid bearer_", Authorization: "BEARER_" + newJwtToken(TokenSecret), Status: 401, Resp: "token is unauthorized\n"},
-		{Name: "invalid bearerx", Authorization: "BEARERx" + newJwtToken(TokenSecret), Status: 401, Resp: "token is unauthorized\n"},
+		{Name: "invalid bearer_", Authorization: "BEARER_" + newJwtToken(TokenSecret), Status: 401, Resp: "no token found\n"},
+		{Name: "invalid bearerx", Authorization: "BEARERx" + newJwtToken(TokenSecret), Status: 401, Resp: "no token found\n"},
 	}
 
 	for _, tc := range tt {
