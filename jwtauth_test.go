@@ -84,6 +84,8 @@ func TestSimple(t *testing.T) {
 		{Name: "valid BEARER", Authorization: "BEARER " + newJwtToken(TokenSecret), Status: 200, Resp: "welcome"},
 		{Name: "valid bearer", Authorization: "bearer " + newJwtToken(TokenSecret), Status: 200, Resp: "welcome"},
 		{Name: "valid claim", Authorization: "Bearer " + newJwtToken(TokenSecret, map[string]interface{}{"service": "test"}), Status: 200, Resp: "welcome"},
+		{Name: "invalid bearer_", Authorization: "BEARER_" + newJwtToken(TokenSecret), Status: 401, Resp: "token is unauthorized\n"},
+		{Name: "invalid bearerx", Authorization: "BEARERx" + newJwtToken(TokenSecret), Status: 401, Resp: "token is unauthorized\n"},
 	}
 
 	for _, tc := range tt {
@@ -93,7 +95,7 @@ func TestSimple(t *testing.T) {
 		}
 		status, resp := testRequest(t, ts, "GET", "/", h, nil)
 		if status != tc.Status || resp != tc.Resp {
-			t.Fatalf("test '%s' failed: expected status %d, got %d", tc.Name, tc.Status, status)
+			t.Errorf("test '%s' failed: expected Status: %d %q, got %d %q", tc.Name, tc.Status, tc.Resp, status, resp)
 		}
 	}
 }
