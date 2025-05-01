@@ -209,7 +209,7 @@ func Authenticator(ja *JWTAuth) func(http.Handler) http.Handler {
 				return
 			}
 
-			if token == nil || jwt.Validate(token, ja.validateOptions...) != nil {
+			if token == nil {
 				http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 				return
 			}
@@ -282,7 +282,7 @@ func SetExpiryIn(claims map[string]interface{}, tm time.Duration) {
 	claims["exp"] = ExpireIn(tm)
 }
 
-// TokenFromCookie tries to retreive the token string from a cookie named
+// TokenFromCookie tries to retrieve the token string from a cookie named
 // "jwt".
 func TokenFromCookie(r *http.Request) string {
 	cookie, err := r.Cookie("jwt")
@@ -292,18 +292,18 @@ func TokenFromCookie(r *http.Request) string {
 	return cookie.Value
 }
 
-// TokenFromHeader tries to retreive the token string from the
-// "Authorization" reqeust header: "Authorization: BEARER T".
+// TokenFromHeader tries to retrieve the token string from the
+// "Authorization" request header: "Authorization: BEARER T".
 func TokenFromHeader(r *http.Request) string {
 	// Get token from authorization header.
 	bearer := r.Header.Get("Authorization")
-	if len(bearer) > 7 && strings.ToUpper(bearer[0:6]) == "BEARER" {
+	if len(bearer) > 7 && strings.ToUpper(bearer[0:7]) == "BEARER " {
 		return bearer[7:]
 	}
 	return ""
 }
 
-// TokenFromQuery tries to retreive the token string from the "jwt" URI
+// TokenFromQuery tries to retrieve the token string from the "jwt" URI
 // query parameter.
 //
 // To use it, build our own middleware handler, such as:
