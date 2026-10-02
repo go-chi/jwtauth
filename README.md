@@ -15,6 +15,12 @@ expired - the `jwtauth.Verifier` middleware handler takes care of all of that. T
 `jwtauth.Verifier` will set the context values on keys `jwtauth.TokenCtxKey` and
 `jwtauth.ErrorCtxKey`.
 
+Note that token expiration requires explicitly setting an expiration claim (`"exp"`)
+when creating the token (e.g. using `jwtauth.SetExpiry(claims, time)` or
+`jwtauth.SetExpiryIn(claims, duration)`). Because the underlying `lestrrat-go/jwx`
+library does not treat zero-value or omitted timestamps as expired during validation,
+tokens without an explicit expiration claim will not expire.
+
 Next, it's up to an authentication handler to respond or continue processing after the
 `jwtauth.Verifier`. The `jwtauth.Authenticator` middleware responds with a 401 Unauthorized
 plain-text payload for all unverified tokens and passes the good ones through. You can
@@ -28,8 +34,8 @@ By default, the `Verifier` will search for a JWT token in a http request, in the
 
 The first JWT string that is found as an authorization header
 or cookie header is then decoded by the `lestrrat-go/jwx` library and a jwt.Token
-object is set on the request context. In the case of a signature decoding error
-the Verifier will also set the error on the request context.
+object is set on the request context. In the case of a decoding, signature, or validation
+error the Verifier will also set the error on the request context.
 
 The Verifier always calls the next http handler in sequence, which can either
 be the generic `jwtauth.Authenticator` middleware or your own custom handler
@@ -50,6 +56,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/jwtauth/v5"
@@ -62,7 +69,9 @@ func init() {
 
 	// For debugging/example purposes, we generate and print
 	// a sample jwt token with claims `user_id:123` here:
-	_, tokenString, _ := tokenAuth.Encode(map[string]interface{}{"user_id": 123})
+	claims := map[string]interface{}{"user_id": 123}
+	jwtauth.SetExpiryIn(claims, 5*time.Minute)
+	_, tokenString, _ := tokenAuth.Encode(claims)
 	fmt.Printf("DEBUG: a sample jwt is %s\n\n", tokenString)
 }
 

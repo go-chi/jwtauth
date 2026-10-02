@@ -1,3 +1,9 @@
+// Package jwtauth provides HTTP middleware for JWT authentication.
+//
+// Tokens are signed, parsed, and validated using the lestrrat-go/jwx library.
+// Note that token expiration is only validated if an expiration claim ("exp")
+// is explicitly set on the token (e.g. via SetExpiry or SetExpiryIn); tokens
+// without an expiration claim or with zero-value timestamps are not treated as expired.
 package jwtauth
 
 import (
@@ -58,9 +64,9 @@ func New(alg string, signKey interface{}, verifyKey interface{}, validateOptions
 //  1. 'Authorization: BEARER T' request header
 //  2. Cookie 'jwt' value
 //
-// The first JWT string that is found as a query parameter, authorization header
-// or cookie header is then decoded by the `jwt-go` library and a *jwt.Token
-// object is set on the request context. In the case of a signature decoding error
+// The first JWT string that is found as an authorization header or cookie header
+// is then decoded by the `lestrrat-go/jwx` library and a jwt.Token object is set
+// on the request context. In the case of a decoding, signature, or validation error,
 // the Verifier will also set the error on the request context.
 //
 // The Verifier always calls the next http handler in sequence, which can either
@@ -102,6 +108,9 @@ func VerifyRequest(ja *JWTAuth, r *http.Request, findTokenFns ...func(r *http.Re
 	return VerifyToken(ja, tokenString)
 }
 
+// VerifyToken decodes, parses, and validates the token string using the configured
+// signature key, algorithm, and validation options. Expiration ("exp") is only validated
+// if the claim was explicitly set on the token.
 func VerifyToken(ja *JWTAuth, tokenString string) (jwt.Token, error) {
 	// Decode & verify the token
 	token, err := ja.Decode(tokenString)
@@ -121,6 +130,9 @@ func VerifyToken(ja *JWTAuth, tokenString string) (jwt.Token, error) {
 	return token, nil
 }
 
+// Encode creates a signed JWT token string from claims. Note that token expiration
+// is not set by default; use SetExpiry or SetExpiryIn on the claims map if expiration
+// validation is required.
 func (ja *JWTAuth) Encode(claims map[string]interface{}) (t jwt.Token, tokenString string, err error) {
 	t = jwt.New()
 	for k, v := range claims {
@@ -153,7 +165,7 @@ func (ja *JWTAuth) parse(payload []byte) (jwt.Token, error) {
 	return jwt.Parse(payload, ja.verifier, jwt.WithValidate(false))
 }
 
-// ErrorReason will normalize the error message from the underlining
+// ErrorReason will normalize the error message from the underlying
 // jwt library
 func ErrorReason(err error) error {
 	switch {
@@ -216,7 +228,7 @@ func FromContext(ctx context.Context) (jwt.Token, map[string]interface{}, error)
 	return token, claims, err
 }
 
-// UnixTime returns the given time in UTC milliseconds
+// UnixTime returns the given time in UTC seconds
 func UnixTime(tm time.Time) int64 {
 	return tm.UTC().Unix()
 }
@@ -241,12 +253,14 @@ func SetIssuedNow(claims map[string]interface{}) {
 	claims["iat"] = EpochNow()
 }
 
-// Set expiry ("exp") in the claims
+// Set expiry ("exp") in the claims. Expiration must be explicitly set for
+// token expiry validation to occur.
 func SetExpiry(claims map[string]interface{}, tm time.Time) {
 	claims["exp"] = tm.UTC().Unix()
 }
 
-// Set expiry ("exp") in the claims to some duration from the present time
+// Set expiry ("exp") in the claims to some duration from the present time.
+// Expiration must be explicitly set for token expiry validation to occur.
 func SetExpiryIn(claims map[string]interface{}, tm time.Duration) {
 	claims["exp"] = ExpireIn(tm)
 }
@@ -275,7 +289,7 @@ func TokenFromHeader(r *http.Request) string {
 // TokenFromQuery tries to retrieve the token string from the "jwt" URI
 // query parameter.
 //
-// To use it, build our own middleware handler, such as:
+// To use it, build your own middleware handler, such as:
 //
 //	func Verifier(ja *JWTAuth) func(http.Handler) http.Handler {
 //		return func(next http.Handler) http.Handler {

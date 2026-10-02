@@ -294,6 +294,76 @@ func TestEncodeClaims(t *testing.T) {
 	}
 }
 
+func TestTokenExpiration(t *testing.T) {
+	// 1. Token without explicit expiry claim does not expire
+	claimsNoExp := map[string]interface{}{"user_id": 1}
+	_, tokenStringNoExp, err := TokenAuthHS256.Encode(claimsNoExp)
+	if err != nil {
+		t.Fatalf("unexpected error encoding token without expiry: %v", err)
+	}
+	tok, err := jwtauth.VerifyToken(TokenAuthHS256, tokenStringNoExp)
+	if err != nil {
+		t.Fatalf("expected token without expiry claim to validate successfully, got: %v", err)
+	}
+	if tok == nil {
+		t.Fatal("expected token to not be nil")
+	}
+
+	// 2. Token with explicit future expiry claim via SetExpiry validates successfully
+	claimsFuture := map[string]interface{}{"user_id": 2}
+	jwtauth.SetExpiry(claimsFuture, time.Now().Add(1*time.Hour))
+	_, tokenStringFuture, err := TokenAuthHS256.Encode(claimsFuture)
+	if err != nil {
+		t.Fatalf("unexpected error encoding token with future expiry: %v", err)
+	}
+	tok, err = jwtauth.VerifyToken(TokenAuthHS256, tokenStringFuture)
+	if err != nil {
+		t.Fatalf("expected token with future expiry to validate, got: %v", err)
+	}
+	if tok == nil {
+		t.Fatal("expected token to not be nil")
+	}
+
+	// 3. Token with explicit future expiry claim via SetExpiryIn validates successfully
+	claimsFutureIn := map[string]interface{}{"user_id": 3}
+	jwtauth.SetExpiryIn(claimsFutureIn, 30*time.Minute)
+	_, tokenStringFutureIn, err := TokenAuthHS256.Encode(claimsFutureIn)
+	if err != nil {
+		t.Fatalf("unexpected error encoding token with SetExpiryIn: %v", err)
+	}
+	tok, err = jwtauth.VerifyToken(TokenAuthHS256, tokenStringFutureIn)
+	if err != nil {
+		t.Fatalf("expected token with future expiry duration to validate, got: %v", err)
+	}
+	if tok == nil {
+		t.Fatal("expected token to not be nil")
+	}
+
+	// 4. Token with explicit past expiry claim via SetExpiry fails validation with ErrExpired
+	claimsExpired := map[string]interface{}{"user_id": 4}
+	jwtauth.SetExpiry(claimsExpired, time.Now().Add(-1*time.Hour))
+	_, tokenStringExpired, err := TokenAuthHS256.Encode(claimsExpired)
+	if err != nil {
+		t.Fatalf("unexpected error encoding expired token: %v", err)
+	}
+	_, err = jwtauth.VerifyToken(TokenAuthHS256, tokenStringExpired)
+	if err != jwtauth.ErrExpired {
+		t.Fatalf("expected ErrExpired, got: %v", err)
+	}
+
+	// 5. Token with past expiry duration via SetExpiryIn fails validation with ErrExpired
+	claimsExpiredIn := map[string]interface{}{"user_id": 5}
+	jwtauth.SetExpiryIn(claimsExpiredIn, -10*time.Minute)
+	_, tokenStringExpiredIn, err := TokenAuthHS256.Encode(claimsExpiredIn)
+	if err != nil {
+		t.Fatalf("unexpected error encoding expired duration token: %v", err)
+	}
+	_, err = jwtauth.VerifyToken(TokenAuthHS256, tokenStringExpiredIn)
+	if err != jwtauth.ErrExpired {
+		t.Fatalf("expected ErrExpired, got: %v", err)
+	}
+}
+
 //
 // Test helper functions
 //
