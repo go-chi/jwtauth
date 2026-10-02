@@ -75,7 +75,9 @@ func init() {
 
 	// For debugging/example purposes, we generate and print
 	// a sample jwt token with claims `user_id:123` here:
-	_, tokenString, _ := tokenAuth.Encode(map[string]interface{}{"user_id": 123})
+	claims := map[string]interface{}{"user_id": 123}
+	jwtauth.SetExpiryIn(claims, 5*time.Minute)
+	_, tokenString, _ := tokenAuth.Encode(claims)
 	fmt.Printf("DEBUG: a sample jwt is %s\n\n", tokenString)
 }
 
