@@ -14,9 +14,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/jwtauth/v5"
-	"github.com/lestrrat-go/jwx/v3/jwa"
-	"github.com/lestrrat-go/jwx/v3/jwt"
-	"github.com/lestrrat-go/jwx/v3/transform"
+	"github.com/jwx-go/jwxfilter/v4"
+	"github.com/lestrrat-go/jwx/v4/jwa"
+	"github.com/lestrrat-go/jwx/v4/jwt"
 )
 
 var (
@@ -142,7 +142,7 @@ func TestSimpleRSA(t *testing.T) {
 	}
 
 	tokenClaims := map[string]interface{}{}
-	if err := transform.AsMap(token, tokenClaims); err != nil {
+	if err := jwxfilter.AsMap(token, tokenClaims); err != nil {
 		t.Fatalf("Failed to get claims %s\n", err.Error())
 	}
 
@@ -178,7 +178,7 @@ func TestSimpleRSAVerifyOnly(t *testing.T) {
 	}
 
 	tokenClaims := map[string]interface{}{}
-	if err := transform.AsMap(token, tokenClaims); err != nil {
+	if err := jwxfilter.AsMap(token, tokenClaims); err != nil {
 		t.Fatalf("Failed to get claims %s\n", err.Error())
 	}
 
@@ -263,6 +263,16 @@ func TestMore(t *testing.T) {
 
 	h = newAuthHeader(map[string]interface{}{"exp": jwtauth.EpochNow() - 1000})
 	if status, resp := testRequest(t, ts, "GET", "/admin", h, nil); status != 401 || resp != "token is expired\n" {
+		t.Fatal(resp)
+	}
+
+	h = newAuthHeader(map[string]interface{}{"nbf": jwtauth.EpochNow() + 1000})
+	if status, resp := testRequest(t, ts, "GET", "/admin", h, nil); status != 401 || resp != "token nbf validation failed\n" {
+		t.Fatal(resp)
+	}
+
+	h = newAuthHeader(map[string]interface{}{"iat": jwtauth.EpochNow() + 1000})
+	if status, resp := testRequest(t, ts, "GET", "/admin", h, nil); status != 401 || resp != "token iat validation failed\n" {
 		t.Fatal(resp)
 	}
 
