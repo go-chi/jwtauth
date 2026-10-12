@@ -266,6 +266,16 @@ func TestMore(t *testing.T) {
 		t.Fatal(resp)
 	}
 
+	h = newAuthHeader(map[string]interface{}{"nbf": jwtauth.EpochNow() + 1000})
+	if status, resp := testRequest(t, ts, "GET", "/admin", h, nil); status != 401 || resp != "token nbf validation failed\n" {
+		t.Fatal(resp)
+	}
+
+	h = newAuthHeader(map[string]interface{}{"iat": jwtauth.EpochNow() + 1000})
+	if status, resp := testRequest(t, ts, "GET", "/admin", h, nil); status != 401 || resp != "token iat validation failed\n" {
+		t.Fatal(resp)
+	}
+
 	// sending authorized requests
 	if status, resp := testRequest(t, ts, "GET", "/", nil, nil); status != 200 || resp != "welcome" {
 		t.Fatal(resp)
