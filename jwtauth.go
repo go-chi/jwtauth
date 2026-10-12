@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lestrrat-go/jwx/v3/jwa"
-	"github.com/lestrrat-go/jwx/v3/jwt"
-	"github.com/lestrrat-go/jwx/v3/transform"
+	"github.com/jwx-go/jwxfilter/v4"
+	"github.com/lestrrat-go/jwx/v4/jwa"
+	"github.com/lestrrat-go/jwx/v4/jwt"
 )
 
 type JWTAuth struct {
@@ -157,11 +157,11 @@ func (ja *JWTAuth) parse(payload []byte) (jwt.Token, error) {
 // jwt library
 func ErrorReason(err error) error {
 	switch {
-	case errors.Is(err, jwt.TokenExpiredError()), err == ErrExpired:
+	case errors.Is(err, jwt.TokenExpiredError{}), err == ErrExpired:
 		return ErrExpired
-	case errors.Is(err, jwt.InvalidIssuedAtError()), err == ErrIATInvalid:
+	case errors.Is(err, jwt.InvalidIssuedAtError{}), err == ErrIATInvalid:
 		return ErrIATInvalid
-	case errors.Is(err, jwt.TokenNotYetValidError()), err == ErrNBFInvalid:
+	case errors.Is(err, jwt.TokenNotYetValidError{}), err == ErrNBFInvalid:
 		return ErrNBFInvalid
 	default:
 		return ErrUnauthorized
@@ -206,7 +206,7 @@ func FromContext(ctx context.Context) (jwt.Token, map[string]interface{}, error)
 	var err error
 	claims := map[string]interface{}{}
 	if token != nil {
-		if err = transform.AsMap(token, claims); err != nil {
+		if err = jwxfilter.AsMap(token, claims); err != nil {
 			return token, nil, err
 		}
 	}
